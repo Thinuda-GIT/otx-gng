@@ -33,9 +33,18 @@
   file that user can read, and the kernel already tells us exactly who the client is. A per-connection
   session id is still issued for logging. This is a deliberate, documented change from the plan.
 - **Allow-list.** Requests are a closed Rust enum (`otx_protocol::Request`). Anything else fails
-  to deserialize and is answered `NOT_ALLOWED`. Phase 2 has only read-only requests: `hello`,
-  `ping`, `getStatus`, `getSystemInfo`. Every later capability is a new reviewed enum variant with
-  typed, validated parameters (IDs, enums, bounded numbers, PID + creation time).
+  to deserialize and is answered `NOT_ALLOWED`. The complete list:
+  - read-only: `hello`, `ping`, `getStatus`, `getSystemInfo`, `listChanges`, `listTweaks`, `getTraffic`;
+  - processes: `setProcessPriority` (no Realtime variant exists), `setEfficiencyMode`, `endProcess`:
+    PID + creation time, protected list and session-0 refusal enforced in the Core;
+  - tweaks: `setTweak` by **id only**; the registry/service/power values live in manifests
+    compiled into the Core;
+  - memory: `cleanMemory` with method enums and plain exe names only;
+  - network: `setDns` (IP literals only, validated), `applyShaper` (exe names; essential and
+    protected processes refused), `restoreInternet`, `preferAdapter` (interface id),
+    `clearAdapterPreference`;
+  - sessions and capture: `startSession`, `endSession`, `startCapture`, `stopCapture`;
+  - journal: `revertChange`, `revertAll`.
 - **Residual risk (accepted):** malware already running as the logged-in user cannot pose as the
   UI, because it cannot write into Program Files without admin rights. It could, however, drive the
   real OTX.GNG window through UI automation to request allow-listed actions. Every such action is

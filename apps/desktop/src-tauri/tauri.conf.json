@@ -23,7 +23,8 @@
         "transparent": true,
         "shadow": false,
         "resizable": true,
-        "visible": false
+        "visible": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,Translate,AutofillServerCommunication --disable-background-networking --disable-component-update --renderer-process-limit=1"
       }
     ],
     "security": {

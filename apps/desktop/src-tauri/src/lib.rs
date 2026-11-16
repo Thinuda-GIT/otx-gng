@@ -4,6 +4,7 @@
 //! named pipe (`core_client`). This process also hosts the tray, global hotkeys, autostart and
 //! "close to tray", and collects system facts itself when the Core is not running.
 
+mod automation;
 mod boost;
 mod core_client;
 mod games;
@@ -29,19 +30,43 @@ pub struct AppState {
     pub core: CoreClient,
     pub library: games::Library,
     pub traffic: net::TrafficState,
+    pub automation: automation::Automation,
     /// Unprivileged live monitor (no handles to other processes are opened).
     monitor: std::sync::Arc<Mutex<Option<otx_monitor::Monitor>>>,
     close_to_tray: AtomicBool,
+    /// Set when the window closes to the tray, so the app does not exit with it.
+    keep_running: AtomicBool,
     /// Shortcut string → action id, so the global handler knows what was pressed.
     shortcuts: Mutex<Vec<(Shortcut, String)>>,
 }
 
+/// Shows the main window, recreating it (and its web view) if it was closed to the tray.
 fn show_main(app: &AppHandle) {
+    if app.get_webview_window("main").is_none() {
+        if let Some(cfg) = app.config().app.windows.first().cloned() {
+            if let Ok(w) = tauri::WebviewWindowBuilder::from_config(app, &cfg).and_then(|b| b.build()) {
+                attach_close_handler(app, &w);
+            }
+        }
+    }
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
+}
+
+/// Closing the window with "minimize to tray" on destroys the window and its web view (freeing
+/// its memory); the app keeps running in the tray and the Rust-side automation keeps working.
+fn attach_close_handler(app: &AppHandle, w: &tauri::WebviewWindow) {
+    let handle = app.clone();
+    w.on_window_event(move |e| {
+        if let WindowEvent::CloseRequested { .. } = e {
+            if handle.state::<AppState>().close_to_tray.load(Ordering::Relaxed) {
+                handle.state::<AppState>().keep_running.store(true, Ordering::Relaxed);
+            }
+        }
+    });
 }
 
 /// System facts: from the Core when it is reachable, otherwise collected locally (read-only,
@@ -266,30 +291,35 @@ pub fn run() {
             quality::net_adapters,
             quality::net_vpn,
             quality::net_prefer,
-            quality::relay_ping
+            quality::relay_ping,
+            automation::set_automation,
+            automation::running_game
         ])
         .setup(|app| {
             build_tray(app)?;
             // Started by autostart with --minimized: stay in the tray.
             let minimized = std::env::args().any(|a| a == "--minimized");
             if let Some(w) = app.get_webview_window("main") {
-                if !minimized {
+                if minimized {
+                    // Autostart: start in the tray without a web view at all.
+                    app.state::<AppState>().keep_running.store(true, Ordering::Relaxed);
+                    let _ = w.destroy();
+                } else {
                     let _ = w.show();
+                    attach_close_handler(app.handle(), &w);
                 }
-                let handle = app.handle().clone();
-                w.on_window_event(move |e| {
-                    if let WindowEvent::CloseRequested { api, .. } = e {
-                        if handle.state::<AppState>().close_to_tray.load(Ordering::Relaxed) {
-                            api.prevent_close();
-                            if let Some(w) = handle.get_webview_window("main") {
-                                let _ = w.hide();
-                            }
-                        }
-                    }
-                });
             }
+            automation::spawn(app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("OTX.GNG failed to start the Tauri runtime");
+        .build(tauri::generate_context!())
+        .expect("OTX.GNG failed to start the Tauri runtime")
+        .run(|app, event| {
+            // Keep running in the tray when the last window closes (unless Quit was chosen).
+            if let tauri::RunEvent::ExitRequested { api, code: None, .. } = event {
+                if app.state::<AppState>().keep_running.swap(false, Ordering::Relaxed) {
+                    api.prevent_exit();
+                }
+            }
+        });
 }

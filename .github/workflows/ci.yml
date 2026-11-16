@@ -10,14 +10,14 @@ permissions:
 
 jobs:
   rust:
-    name: Rust tests (protocol, sysinfo, core incl. named-pipe IPC)
+    name: Rust tests (all crates, incl. named-pipe IPC and relay)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Test
-        run: cargo test --locked -p otx-protocol -p otx-sysinfo -p otx-core
+        run: cargo test --locked -p otx-protocol -p otx-sysinfo -p otx-monitor -p otx-tweaks -p otx-net -p otx-games -p otx-core -p otx-relay
       - name: Generated TypeScript types are up to date
         run: git diff --exit-code -- apps/desktop/src/backend/generated
       - name: Hardware detection runs on the CI machine

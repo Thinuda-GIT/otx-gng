@@ -40,6 +40,9 @@ licenses on every build from Phase 10 on (`license-checker` for npm, `cargo-deny
 | tracing, tracing-subscriber, tracing-appender | 0.1 / 0.3 / 0.2 | MIT | Logging |
 | rand, hex | 0.9 / 0.4 | MIT OR Apache-2.0 | Session ids |
 | @tauri-apps/plugin-autostart (npm) | 2.7.0 | MIT OR Apache-2.0 | Autostart from the UI |
+| ferrisetw | 1.2.0 | MIT OR Apache-2.0 | ETW consumer (per-app traffic, frame capture) |
+| hmac, sha2 | 0.12 / 0.10 | MIT OR Apache-2.0 | Relay packet authentication |
+| tempfile (tests only) | 3.27 | MIT OR Apache-2.0 | Test fixtures |
 
 **Full transitive tree (466 crates, checked with `cargo metadata` on 2026-11-16):** every crate is
 under MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib, Unlicense, CC0/MIT-0, Unicode-3.0, or MPL-2.0
@@ -62,9 +65,7 @@ file-level copyleft and explicitly GPL-compatible. No crate is unlicensed.
 
 | Component | License | Phase | Note |
 |---|---|---|---|
-| ferrisetw | MIT OR Apache-2.0 | 3, 6 | ETW consumer |
-| PresentMon | MIT (verify at bundling) | 8 | Frame-time capture |
-| DB-IP Lite (country/ASN) | CC BY 4.0 (attribution required) | 6 | Offline IP database |
+| DB-IP Lite (country/ASN) | CC BY 4.0 (attribution required) | later | Offline IP database (not bundled yet) |
 | WinDivert (optional) | LGPL-3.0 (chosen option of LGPLv3/GPLv2 dual license) | 6 | Inbound limiter, off by default |
 | wireguard-nt (optional) | Prebuilt signed binaries, redistributable (verify terms) | 9 | Relay tunnel |
 | LibreHardwareMonitor (optional) | MPL-2.0 | 10 | Sensors, off by default |

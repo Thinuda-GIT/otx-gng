@@ -6,12 +6,12 @@ Free, honest, measurable game boosting for Windows 10 and 11. Free up RAM, give 
 priority, tame background network use and lower lag, in a glass interface. No paywall, no
 account, no ads, no telemetry unless you opt in.
 
-> **Status: Phase 2 of 10.** The desktop app reads your real hardware and talks to the OTX.GNG
-> Core service over a secured pipe. The Core can't change anything yet, and most pages still show
-> preview data (the amber "Preview data" chip). See [PROGRESS.md](PROGRESS.md) and
-> [docs/SECURITY.md](docs/SECURITY.md).
+> **Status: all ten phases built (v0.2.0, not released yet).** Everything listed below works in
+> the desktop app on real data, with the gaps stated honestly in [PROGRESS.md](PROGRESS.md#known-gaps-honest-list).
+> Docs: [User guide](docs/USER_GUIDE.md) · [Security](docs/SECURITY.md) · [Anti-cheat notes](docs/ANTICHEAT_NOTES.md) ·
+> [Privacy](docs/PRIVACY.md) · [Relay hosting](docs/RELAY_HOSTING.md) · [Contributing](CONTRIBUTING.md)
 
-## What it will do
+## What it does
 
 | Area | What it does | Tier |
 |---|---|---|

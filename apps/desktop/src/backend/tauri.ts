@@ -555,7 +555,7 @@ export async function setAutostart(enabled: boolean): Promise<boolean> {
   return a.isEnabled();
 }
 
-export async function onDesktopEvent(name: "tray-action" | "shortcut", cb: (payload: string) => void): Promise<() => void> {
+export async function onDesktopEvent<T = string>(name: string, cb: (payload: T) => void): Promise<() => void> {
   const { listen } = await import("@tauri-apps/api/event");
-  return listen<string>(name, (e) => cb(e.payload));
+  return listen<T>(name, (e) => cb(e.payload));
 }
