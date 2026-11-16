@@ -38,6 +38,12 @@ pub struct Target {
     pub exe: String,
 }
 
+impl Target {
+    pub fn handle(&self) -> HANDLE {
+        self.handle
+    }
+}
+
 impl Drop for Target {
     fn drop(&mut self) {
         unsafe {

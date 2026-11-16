@@ -1,0 +1,95 @@
+[
+  {
+    "id": "hags", "scope": "machine", "title": "Hardware-accelerated GPU scheduling", "requiresReboot": true,
+    "ops": [{ "kind": "reg", "root": "hklm", "key": "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers", "name": "HwSchMode", "value": { "type": "dword", "data": 2 } }]
+  },
+  {
+    "id": "key-repeat", "scope": "user", "title": "Faster key repeat",
+    "ops": [
+      { "kind": "spi", "setting": "keyboardDelay", "value": [0] },
+      { "kind": "spi", "setting": "keyboardSpeed", "value": [31] }
+    ]
+  },
+  {
+    "id": "perf-counters", "scope": "machine", "title": "Turn off third-party performance counters",
+    "unsupported": "Held back in this version: each counter provider must be reviewed individually so Task Manager and the Usage Monitor keep working. Gains are rarely measurable."
+  },
+  {
+    "id": "fg-boost", "scope": "machine", "title": "Foreground priority boost", "inHighPerformance": true,
+    "ops": [{ "kind": "reg", "root": "hklm", "key": "SYSTEM\\CurrentControlSet\\Control\\PriorityControl", "name": "Win32PrioritySeparation", "value": { "type": "dword", "data": 38 } }]
+  },
+  {
+    "id": "nic-power", "scope": "machine", "title": "Network adapter power saving off", "inHighPerformance": true, "requiresReboot": true,
+    "ops": [{ "kind": "reg", "root": "hklm", "key": "$adapterClassKey", "name": "PnPCapabilities", "value": { "type": "dword", "data": 24 } }]
+  },
+  {
+    "id": "game-dvr", "scope": "user", "title": "Background game capture off", "inHighPerformance": true,
+    "ops": [
+      { "kind": "reg", "root": "hkcu", "key": "System\\GameConfigStore", "name": "GameDVR_Enabled", "value": { "type": "dword", "data": 0 } },
+      { "kind": "reg", "root": "hkcu", "key": "Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR", "name": "AppCaptureEnabled", "value": { "type": "dword", "data": 0 } }
+    ]
+  },
+  {
+    "id": "core-unpark", "scope": "machine", "title": "Keep all CPU cores awake", "inHighPerformance": true,
+    "ops": [{ "kind": "powerAc", "subgroup": "54533251-82be-4824-96c1-47b60b740d00", "setting": "0cc5b647-c1df-4637-891a-dec35c318583", "value": 100 }]
+  },
+  {
+    "id": "ntfs-lastaccess", "scope": "machine", "title": "Skip file last-access updates", "inHighPerformance": true, "requiresReboot": true,
+    "ops": [{ "kind": "reg", "root": "hklm", "key": "SYSTEM\\CurrentControlSet\\Control\\FileSystem", "name": "NtfsDisableLastAccessUpdate", "value": { "type": "dword", "data": 2147483649 } }]
+  },
+  {
+    "id": "sysmain", "scope": "machine", "title": "SysMain (prefetch service) off",
+    "ops": [{ "kind": "service", "name": "SysMain", "start": "disabled" }]
+  },
+  {
+    "id": "search-index", "scope": "machine", "title": "Search indexing off",
+    "ops": [{ "kind": "service", "name": "WSearch", "start": "disabled" }]
+  },
+  {
+    "id": "ultimate-plan", "scope": "machine", "title": "Ultimate Performance power plan", "inHighPerformance": true,
+    "ops": [{ "kind": "performanceScheme" }]
+  },
+  {
+    "id": "game-mode", "scope": "user", "title": "Windows Game Mode", "inHighPerformance": true,
+    "ops": [{ "kind": "reg", "root": "hkcu", "key": "Software\\Microsoft\\GameBar", "name": "AutoGameModeEnabled", "value": { "type": "dword", "data": 1 } }]
+  },
+  {
+    "id": "mouse-accel", "scope": "user", "title": "Mouse acceleration off", "inHighPerformance": true,
+    "ops": [{ "kind": "spi", "setting": "mouse", "value": [0, 0, 0] }]
+  },
+  {
+    "id": "net-throttle", "scope": "machine", "title": "Network throttling index off", "requiresReboot": true,
+    "ops": [{ "kind": "reg", "root": "hklm", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile", "name": "NetworkThrottlingIndex", "value": { "type": "dword", "data": 4294967295 } }]
+  },
+  {
+    "id": "nagle", "scope": "machine", "title": "Faster TCP acknowledgements", "requiresReboot": true,
+    "ops": [
+      { "kind": "reg", "root": "hklm", "key": "SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\$adapterGuid", "name": "TcpAckFrequency", "value": { "type": "dword", "data": 1 } },
+      { "kind": "reg", "root": "hklm", "key": "SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\$adapterGuid", "name": "TCPNoDelay", "value": { "type": "dword", "data": 1 } }
+    ]
+  },
+  {
+    "id": "mmcss-games", "scope": "machine", "title": "Multimedia scheduler Games profile",
+    "ops": [
+      { "kind": "reg", "root": "hklm", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "name": "GPU Priority", "value": { "type": "dword", "data": 8 } },
+      { "kind": "reg", "root": "hklm", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "name": "Priority", "value": { "type": "dword", "data": 6 } },
+      { "kind": "reg", "root": "hklm", "key": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "name": "Scheduling Category", "value": { "type": "sz", "data": "High" } }
+    ]
+  },
+  {
+    "id": "timer-res", "scope": "machine", "title": "Timer resolution",
+    "unsupported": "Hidden until a Benchmark Lab run on this PC shows a measurable gain. On Windows 11 the request has no effect on other apps unless an extra system setting is changed."
+  },
+  {
+    "id": "gpu-pref", "scope": "user", "title": "High-performance GPU for games", "inHighPerformance": true,
+    "unsupported": "Applied per game: set it in each game's profile in the Library."
+  },
+  {
+    "id": "ue-config", "scope": "user", "title": "Unreal Engine config tuner",
+    "unsupported": "Applied per game from the Library, after you launch the game once so its config file exists."
+  },
+  {
+    "id": "bg-priority", "scope": "machine", "title": "Lower priority for background apps", "inHighPerformance": true,
+    "unsupported": "Part of Game Mode: applied while a game runs and undone when it closes. Turn it on in a game's profile."
+  }
+]

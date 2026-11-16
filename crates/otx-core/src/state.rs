@@ -14,8 +14,7 @@ pub struct CoreState {
     pub elevated: bool,
     /// Directory holding otx-core.exe; the UI exe must live here in service mode.
     pub core_dir: PathBuf,
-    /// Logs and journal location (reported in diagnostics bundles from Phase 10).
-    #[allow(dead_code)]
+    /// Logs, journal and markers.
     pub data_dir: PathBuf,
     pub started: Instant,
     pub recovered_changes: u32,

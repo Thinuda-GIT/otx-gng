@@ -12,7 +12,7 @@ export function smartRamMethods(): RamMethod[] {
     : ["memoryPriority", "trimWorkingSets", "purgeStandby", "flushModified"];
 }
 
-export async function cleanRamNow(trigger: "manual" | "boost" = "manual") {
+export async function cleanRamNow(trigger: "manual" | "boost" | "status" | "schedule" = "manual") {
   const r = await backend.cleanRam(smartRamMethods(), trigger);
   ui().toast({
     tone: r.freedMB > 0 ? "ok" : "info",

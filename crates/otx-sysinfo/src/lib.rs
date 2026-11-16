@@ -352,20 +352,19 @@ pub fn power_info() -> Result<PowerInfo, String> {
     })
 }
 
-pub fn network_info() -> Result<Option<NetworkInfo>, String> {
+/// Interface GUID (e.g. "{6B29FC40-...}") of the primary adapter, used by network tweaks.
+pub fn primary_adapter_guid() -> Option<String> {
+    adapters().ok()?.into_iter().min_by_key(|(c, _)| c.metric).map(|(_, guid)| guid)
+}
+
+fn adapters() -> Result<Vec<(AdapterCandidate, String)>, String> {
     let mut size: u32 = 16 * 1024;
     let mut buf: Vec<u8>;
     let mut tries = 0;
     loop {
         buf = vec![0u8; size as usize];
         let r = unsafe {
-            GetAdaptersAddresses(
-                AF_UNSPEC.0 as u32,
-                GAA_FLAG_INCLUDE_GATEWAYS,
-                None,
-                Some(buf.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH),
-                &mut size,
-            )
+            GetAdaptersAddresses(AF_UNSPEC.0 as u32, GAA_FLAG_INCLUDE_GATEWAYS, None, Some(buf.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH), &mut size)
         };
         if r == ERROR_SUCCESS.0 {
             break;
@@ -375,22 +374,31 @@ pub fn network_info() -> Result<Option<NetworkInfo>, String> {
             return Err(format!("GetAdaptersAddresses failed with code {r}"));
         }
     }
-    let mut candidates = Vec::new();
+    let mut out = Vec::new();
     let mut p = buf.as_ptr() as *const IP_ADAPTER_ADDRESSES_LH;
     while !p.is_null() {
-        // SAFETY: a linked list written by the OS inside `buf`, which outlives this loop.
+        // SAFETY: linked list written by the OS inside `buf`, which outlives this loop.
         let a = unsafe { &*p };
         if a.OperStatus == IfOperStatusUp && !a.FirstGatewayAddress.is_null() {
-            candidates.push(AdapterCandidate {
-                name: unsafe { a.FriendlyName.to_string() }.unwrap_or_default(),
-                description: unsafe { a.Description.to_string() }.unwrap_or_default(),
-                if_type: a.IfType,
-                link_bps: a.TransmitLinkSpeed,
-                metric: a.Ipv4Metric,
-            });
+            let guid = unsafe { a.AdapterName.to_string() }.unwrap_or_default();
+            out.push((
+                AdapterCandidate {
+                    name: unsafe { a.FriendlyName.to_string() }.unwrap_or_default(),
+                    description: unsafe { a.Description.to_string() }.unwrap_or_default(),
+                    if_type: a.IfType,
+                    link_bps: a.TransmitLinkSpeed,
+                    metric: a.Ipv4Metric,
+                },
+                guid,
+            ));
         }
         p = a.Next;
     }
+    Ok(out)
+}
+
+pub fn network_info() -> Result<Option<NetworkInfo>, String> {
+    let candidates = adapters()?.into_iter().map(|(c, _)| c).collect();
     Ok(logic::pick_primary(candidates).map(|c| NetworkInfo {
         kind: logic::link_kind(c.if_type),
         name: c.name,

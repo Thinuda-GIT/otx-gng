@@ -75,6 +75,68 @@ pub enum Request {
     RevertChange { id: String },
     /// Undo every journaled change ("Revert everything").
     RevertAll,
+    /// State of every machine-scope tweak (read-only checks).
+    ListTweaks,
+    /// Apply (on) or revert (off) one machine-scope tweak by id. Only manifests built into the
+    /// Core can run; the UI never sends registry paths or values.
+    #[serde(rename_all = "camelCase")]
+    SetTweak { id: String, on: bool, dry_run: bool },
+    /// Free memory with the chosen methods. `allow` and `skip` are plain exe names
+    /// (allow-listed apps and the running game); they are never trimmed.
+    #[serde(rename_all = "camelCase")]
+    CleanMemory { methods: Vec<RamMethod>, allow: Vec<String>, skip: Vec<String>, dry_run: bool },
+    /// Point the primary adapter at these DNS servers (IP literals only), or back to automatic
+    /// (DHCP) when `servers` is empty.
+    #[serde(rename_all = "camelCase")]
+    SetDns { servers: Vec<String>, dry_run: bool },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum RamMethod {
+    MemoryPriority,
+    TrimWorkingSets,
+    PurgeStandby,
+    FlushModified,
+    TrimFileCache,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum TweakState {
+    Applied,
+    NotApplied,
+    Partial,
+    Unsupported,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TweakStatus {
+    pub id: String,
+    pub state: TweakState,
+    pub reason: Option<String>,
+    /// True when OTX.GNG made the change (so it can revert it from its snapshot).
+    pub by_otx: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RamCleanReport {
+    pub dry_run: bool,
+    #[ts(type = "number")]
+    pub available_before_mb: u64,
+    #[ts(type = "number")]
+    pub available_after_mb: u64,
+    /// After minus before; can be negative when other apps allocated memory meanwhile.
+    #[ts(type = "number")]
+    pub freed_mb: i64,
+    pub done: Vec<String>,
+    pub skipped: Vec<String>,
 }
 
 /// A process identified by PID AND creation time, so a recycled PID can never be targeted.
@@ -142,6 +204,8 @@ pub enum Response {
     /// Result of a process action or revert.
     Action(ActionResult),
     Changes(Vec<ChangeEntry>),
+    Tweaks(Vec<TweakStatus>),
+    RamClean(RamCleanReport),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]

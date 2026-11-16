@@ -4,6 +4,7 @@
 //! named pipe (`core_client`). This process also hosts the tray, global hotkeys, autostart and
 //! "close to tray", and collects system facts itself when the Core is not running.
 
+mod boost;
 mod core_client;
 
 use core_client::CoreClient;
@@ -21,8 +22,8 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 pub const BRAND_LINE: &str = "OTX.GNG — Built and performed by Thinuda";
 
 #[derive(Default)]
-struct AppState {
-    core: CoreClient,
+pub struct AppState {
+    pub core: CoreClient,
     /// Unprivileged live monitor (no handles to other processes are opened).
     monitor: std::sync::Arc<Mutex<Option<otx_monitor::Monitor>>>,
     close_to_tray: AtomicBool,
@@ -233,7 +234,15 @@ pub fn run() {
             core_set_efficiency,
             core_end_process,
             core_list_changes,
-            core_revert
+            core_revert,
+            boost::tweaks_status,
+            boost::tweak_set,
+            boost::user_changes,
+            boost::user_revert,
+            boost::ram_clean,
+            boost::dns_benchmark,
+            boost::dns_current,
+            boost::dns_set
         ])
         .setup(|app| {
             build_tray(app)?;

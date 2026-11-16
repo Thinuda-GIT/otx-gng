@@ -25,6 +25,7 @@ tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
 windows-service = "0.8.1"
 otx-monitor = { version = "0.2.0", path = "../otx-monitor" }
+otx-tweaks = { version = "0.2.0", path = "../otx-tweaks" }
 
 [dependencies.windows]
 version = "0.61.3"
@@ -32,7 +33,14 @@ features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Security_Authorization",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Networking_WinSock",
+  "Win32_System_Memory",
   "Win32_System_Pipes",
+  "Win32_System_ProcessStatus",
+  "Win32_System_Restore",
+  "Win32_System_SystemInformation",
   "Win32_System_RemoteDesktop",
   "Win32_System_Threading",
 ]

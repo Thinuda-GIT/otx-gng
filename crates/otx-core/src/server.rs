@@ -175,6 +175,10 @@ pub fn dispatch(state: &CoreState, f: RequestFrame) -> ResponseFrame {
         Request::EndProcess { target, dry_run } => result(f.id, crate::actions::end_process(state, target, dry_run)),
         Request::RevertChange { id } => result(f.id, crate::actions::revert(state, Some(&id))),
         Request::RevertAll => result(f.id, crate::actions::revert(state, None)),
+        Request::ListTweaks => ResponseFrame::ok(f.id, crate::boost::list_tweaks(state)),
+        Request::SetTweak { id, on, dry_run } => result(f.id, crate::boost::set_tweak(state, &id, on, dry_run)),
+        Request::CleanMemory { methods, allow, skip, dry_run } => result(f.id, crate::boost::clean_memory(state, &methods, &allow, &skip, dry_run)),
+        Request::SetDns { servers, dry_run } => result(f.id, crate::boost::set_dns(state, &servers, dry_run)),
     }
 }
 

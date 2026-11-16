@@ -68,3 +68,21 @@ describe("Core badge", () => {
     expect(coreLabel({ link: "connected", message: null, status: { ...st, safeMode: true } }).tone).toBe("warn");
   });
 });
+
+describe("RAM status rule and routine", async () => {
+  const { ramStatusFrom } = await import("../backend/tauri");
+  const { shouldClean } = await import("./useRamRoutine");
+  it("flags low available memory and high commit", () => {
+    expect(ramStatusFrom(16000, 900, 20000, 36000, 800).status).toBe("needs-cleaning");
+    expect(ramStatusFrom(16000, 9000, 33000, 36000, 800).status).toBe("needs-cleaning");
+    expect(ramStatusFrom(16000, 9000, 10000, 36000, 800).status).toBe("healthy");
+  });
+  it("routine respects the switches and the 10-minute gap", () => {
+    const base = { enabled: true, onStatus: true, scheduleOn: false, everyHours: 12, needsCleaning: true, now: 10_000_000, lastClean: 0 };
+    expect(shouldClean(base)).toBe("status");
+    expect(shouldClean({ ...base, enabled: false })).toBeNull();
+    expect(shouldClean({ ...base, lastClean: base.now - 60_000 })).toBeNull();
+    expect(shouldClean({ ...base, needsCleaning: false })).toBeNull();
+    expect(shouldClean({ ...base, needsCleaning: false, scheduleOn: true, everyHours: 1, now: 4 * 3_600_000, lastClean: 0 })).toBe("schedule");
+  });
+});

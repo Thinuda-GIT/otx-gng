@@ -12,9 +12,12 @@
 //! Core still answers status and read-only queries. Dry run (`--dry-run`) logs what would change.
 
 mod actions;
+mod boost;
+mod dns;
 mod install;
 mod journal;
 mod process;
+mod ram;
 mod security;
 mod server;
 mod state;

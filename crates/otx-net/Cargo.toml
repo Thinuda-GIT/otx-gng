@@ -1,0 +1,22 @@
+[package]
+name = "otx-net"
+description = "Unprivileged network tools for OTX.GNG: DNS benchmark, current DNS, ping, TCP probes, traceroute, connections."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+otx-protocol = { version = "0.2.0", path = "../otx-protocol" }
+serde = { version = "1.0.229", features = ["derive"] }
+
+[dependencies.windows]
+version = "0.61.3"
+features = [
+  "Win32_Foundation",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Networking_WinSock",
+  "Win32_System_IO",
+]

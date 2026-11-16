@@ -5,6 +5,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { MockBackend } from "./mock";
 import type { ActionResult, ChangeRecord, CoreConnection, Metrics, PriorityLevel, ProcessDetails, ProcessGroup, SystemMetrics, SystemSnapshot } from "./types";
 import type { ChangeEntry } from "./generated/ChangeEntry";
+import type { DnsResult, DnsServer, RamCleanResult, RamMethod, RamStatus, Tweak, TweakApplyResult } from "./types";
+import type { RamCleanReport } from "./generated/RamCleanReport";
+import type { TweakStatus } from "./generated/TweakStatus";
+import { MOCK_NOT_RECOMMENDED } from "./mockData";
+import { useLive } from "../store/live";
+import { useSettings } from "../store/settings";
 import type { SystemSnapshot as WireSnapshot } from "./generated/SystemSnapshot";
 
 export class TauriBackend extends MockBackend {
@@ -94,21 +100,164 @@ export class TauriBackend extends MockBackend {
     return this.forEach(g, "core_end_process", { dryRun });
   }
 
-  /** The real change journal from the Core (empty when the Core is not running). */
+  /** Real changes: the Core's journal plus per-user tweaks applied by the app. */
   override async getChanges(): Promise<ChangeRecord[]> {
-    try {
-      const list = await invoke<ChangeEntry[]>("core_list_changes");
-      return list.map((c) => ({ id: c.id, at: c.createdUnix * 1000, title: c.title, detail: c.detail, kind: "priority", temporary: c.temporary }));
-    } catch {
-      return [];
-    }
+    const toRecord = (c: ChangeEntry): ChangeRecord => ({ id: c.id, at: c.createdUnix * 1000, title: c.title, detail: c.detail, kind: "tweak", temporary: c.temporary });
+    const core = await invoke<ChangeEntry[]>("core_list_changes").catch(() => [] as ChangeEntry[]);
+    const user = await invoke<ChangeEntry[]>("user_changes").catch(() => [] as ChangeEntry[]);
+    return [...core, ...user].map(toRecord).sort((a, b) => b.at - a.at);
   }
   override async revertChange(id: string): Promise<void> {
-    await invoke("core_revert", { id });
+    if (id.startsWith("user:")) await invoke("user_revert", { id: id.slice(5) });
+    else await invoke("core_revert", { id });
   }
   override async revertAll(): Promise<void> {
-    await invoke("core_revert", { id: null });
+    const errors: string[] = [];
+    await invoke("core_revert", { id: null }).catch((e: unknown) => errors.push(String(e)));
+    await invoke("user_revert", { id: null }).catch((e: unknown) => errors.push(String(e)));
+    if (errors.length) throw new Error(errors.join("; "));
   }
+
+  /* ---------------- PC Boost (Phase 4) ---------------- */
+
+  override async getTweaks(): Promise<Tweak[]> {
+    const meta = await super.getTweaks(); // titles, descriptions, risk/evidence labels
+    const status = await invoke<TweakStatus[]>("tweaks_status");
+    const sys = useLive.getState().system;
+    return meta.map((t) => {
+      const st = status.find((s) => s.id === t.id);
+      const rules = MOCK_NOT_RECOMMENDED[t.id] ?? [];
+      return {
+        ...t,
+        enabled: st?.state === "applied",
+        supported: !!st && st.state !== "unsupported",
+        unsupportedReason: st?.reason ?? undefined,
+        notRecommendedIf: rules.map((r) => ({ label: r.label, matches: sys ? r.when(sys.info) : false })),
+      };
+    });
+  }
+
+  override async setTweak(id: string, enabled: boolean, dryRun: boolean): Promise<TweakApplyResult> {
+    try {
+      const r = await invoke<ActionResult>("tweak_set", { id, on: enabled, dryRun });
+      return { ok: true, dryRun: r.dryRun, changes: r.changes };
+    } catch (e) {
+      return { ok: false, dryRun, changes: [], error: String(e) };
+    }
+  }
+
+  override async applyPreset(preset: "default" | "high", dryRun: boolean): Promise<TweakApplyResult> {
+    const tweaks = await this.getTweaks();
+    const changes: string[] = [];
+    const errors: string[] = [];
+    for (const t of tweaks.filter((x) => x.supported)) {
+      // "Default" reverts only what OTX.GNG changed; it never guesses Windows defaults.
+      const want = preset === "high" ? t.inHighPerformance : false;
+      if (preset === "high" && (!want || t.enabled)) continue;
+      if (preset === "default" && !t.enabled) continue;
+      const r = await this.setTweak(t.id, want, dryRun);
+      if (r.ok) changes.push(...r.changes);
+      else if (preset === "high") errors.push(`${t.title}: ${r.error}`);
+    }
+    return { ok: errors.length === 0, dryRun, changes, error: errors.join("; ") || undefined };
+  }
+
+  private ramLog: RamCleanResult[] = [];
+
+  override async getRamStatus(): Promise<RamStatus> {
+    const s = await invoke<SystemMetrics>("monitor_system");
+    return ramStatusFrom(s.ramTotalMb, s.ramAvailableMb, s.commitMb, s.commitLimitMb, s.standbyMb ?? 0);
+  }
+
+  override async cleanRam(methods: RamMethod[], trigger: RamCleanResult["trigger"]): Promise<RamCleanResult> {
+    const allow = useSettings.getState().ramAllowList;
+    const r = await invoke<RamCleanReport>("ram_clean", { methods, allow, skip: [], dryRun: useSettings.getState().dryRun });
+    const res: RamCleanResult = {
+      id: `ram-${Date.now()}`,
+      at: Date.now(),
+      trigger,
+      methods,
+      availableBeforeMB: r.availableBeforeMb,
+      availableAfterMB: r.availableAfterMb,
+      freedMB: r.freedMb,
+      skipped: r.skipped,
+    };
+    this.ramLog.unshift(res);
+    return res;
+  }
+
+  override async getRamHistory(): Promise<RamCleanResult[]> {
+    return [...this.ramLog];
+  }
+
+  private dnsList: DnsServer[] | null = null;
+
+  override async getDnsServers(): Promise<DnsServer[]> {
+    if (!this.dnsList) {
+      const base = await super.getDnsServers();
+      const current = await invoke<string[]>("dns_current").catch(() => [] as string[]);
+      const local = current.some((ip) => ip.startsWith("127.") || ip === "::1");
+      this.dnsList = base.map((s) =>
+        s.isp
+          ? { ...s, name: local ? "Current (set by a local app such as a VPN)" : "Current (your network)", v4: current.filter((i) => !i.includes(":")), v6: current.filter((i) => i.includes(":")) }
+          : s,
+      );
+    }
+    return [...this.dnsList];
+  }
+
+  override async benchmarkDns(onProgress: (done: number, total: number) => void): Promise<DnsResult[]> {
+    const servers = await this.getDnsServers();
+    const pairs = servers.filter((s) => s.v4[0] ?? s.v6[0]).map((s) => [s.id, s.v4[0] ?? s.v6[0]] as [string, string]);
+    onProgress(0, 1);
+    const res = await invoke<{ serverId: string; medianMs: number | null; jitterMs: number; failures: number; samples: number }[]>("dns_benchmark", { servers: pairs, samples: 8 });
+    onProgress(1, 1);
+    return res.map((r) => ({ serverId: r.serverId, medianMs: r.medianMs ?? Number.NaN, jitterMs: r.jitterMs, failures: r.failures, samples: r.samples }));
+  }
+
+  override async applyDns(serverId: string): Promise<void> {
+    const s = (await this.getDnsServers()).find((x) => x.id === serverId);
+    if (!s) throw new Error("Unknown DNS server");
+    const r = await invoke<ActionResult>("dns_set", { servers: [...s.v4, ...s.v6], dryRun: useSettings.getState().dryRun });
+    if (r.dryRun) throw new Error(`Dry run: ${r.changes.join("; ")}`);
+  }
+
+  override async resetDns(): Promise<void> {
+    await invoke<ActionResult>("dns_set", { servers: [], dryRun: useSettings.getState().dryRun });
+  }
+
+  override async getActiveDns(): Promise<string | null> {
+    const current = await invoke<string[]>("dns_current").catch(() => [] as string[]);
+    const servers = await this.getDnsServers();
+    return servers.find((s) => !s.isp && s.v4.length > 0 && s.v4.every((ip) => current.includes(ip)))?.id ?? null;
+  }
+
+  override async addDnsServer(name: string, v4: string[]): Promise<DnsServer> {
+    const s: DnsServer = { id: `custom-${Date.now()}`, name, v4, v6: [], filtering: false, isp: false, custom: true };
+    this.dnsList = [...(await this.getDnsServers()), s];
+    return s;
+  }
+}
+
+/** The RAM status rule, shared with the mock: needs cleaning below 25% available or above 85% commit. */
+export function ramStatusFrom(totalMB: number, availableMB: number, commitMB: number, commitLimitMB: number, standbyMB: number): RamStatus {
+  const availPct = (availableMB / totalMB) * 100;
+  const commitPct = (commitMB / commitLimitMB) * 100;
+  const needs = availPct < 25 || commitPct > 85;
+  return {
+    totalMB,
+    usedMB: totalMB - availableMB,
+    availableMB,
+    standbyMB,
+    modifiedMB: 0,
+    commitPct,
+    status: needs ? "needs-cleaning" : "healthy",
+    reason: needs
+      ? availPct < 25
+        ? `Available memory is ${availPct.toFixed(0)}%, below the 25% threshold.`
+        : `Commit charge is ${commitPct.toFixed(0)}% of the limit, above 85%.`
+      : `Available memory is ${availPct.toFixed(0)}% and commit is ${commitPct.toFixed(0)}%: no cleaning needed.`,
+  };
 }
 
 /** Desktop-only integrations. All are no-ops outside Tauri. */

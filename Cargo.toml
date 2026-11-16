@@ -4,6 +4,8 @@ members = [
   "crates/otx-protocol",
   "crates/otx-sysinfo",
   "crates/otx-monitor",
+  "crates/otx-tweaks",
+  "crates/otx-net",
   "crates/otx-core",
   "apps/desktop/src-tauri",
 ]
