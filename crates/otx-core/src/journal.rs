@@ -35,6 +35,8 @@ pub enum RevertOp {
     FirewallRule { name: String },
     /// Remove a QoS throttle policy OTX.GNG added.
     QosPolicy { exe: String },
+    /// Restore an interface metric (Multi Internet).
+    InterfaceMetric { luid: String, automatic: bool, metric: u32 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -76,6 +78,7 @@ impl Reverter for SystemReverter {
             RevertOp::Tweak { prev, .. } => otx_tweaks::revert(&otx_tweaks::win::WinSys { scope: otx_tweaks::Scope::Machine }, prev),
             RevertOp::FirewallRule { name } => crate::shaper::remove_rule(name),
             RevertOp::QosPolicy { exe } => crate::shaper::remove_qos(exe),
+            RevertOp::InterfaceMetric { luid, automatic, metric } => crate::netif::set(luid.parse().map_err(|_| "bad luid".to_string())?, *automatic, *metric),
             RevertOp::Dns { adapter, v4, v6 } => {
                 crate::dns::set(adapter, false, v4)?;
                 let _ = crate::dns::set(adapter, true, v6);

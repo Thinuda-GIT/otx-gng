@@ -186,6 +186,11 @@ pub fn dispatch(state: &Arc<CoreState>, f: RequestFrame) -> ResponseFrame {
             Err(e) => ResponseFrame::err(f.id, ErrorCode::Unsupported, e),
         },
         Request::ApplyShaper { rules, dry_run } => result(f.id, crate::shaper::apply(state, &rules, dry_run)),
+        Request::PreferAdapter { luid, dry_run } => result(f.id, crate::netif::prefer(state, &luid, dry_run)),
+        Request::ClearAdapterPreference => {
+            let n = crate::netif::unprefer(state);
+            ResponseFrame::ok(f.id, Response::Action(otx_protocol::ActionResult { dry_run: false, changes: vec![format!("{n} connections back to automatic")], change_id: None }))
+        }
         Request::RestoreInternet => {
             let n = crate::shaper::restore(state);
             ResponseFrame::ok(f.id, Response::Action(otx_protocol::ActionResult { dry_run: false, changes: vec![format!("{n} rules removed")], change_id: None }))

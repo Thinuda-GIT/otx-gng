@@ -12,7 +12,15 @@ import { MOCK_NOT_RECOMMENDED } from "./mockData";
 import type { BoostStep, BoostSummary, Game, GameProfile } from "./types";
 import { startSession, stepsFrom, tintFor } from "./gameMode";
 import { useProfiles } from "../store/profiles";
-import type { Connection, ShaperRule, TrafficApp } from "./types";
+import type { Adapter, Connection, Hop, QualityResult, ShaperRule, TrafficApp, TuneFinding } from "./types";
+
+interface ProbeStats {
+  sent: number;
+  received: number;
+  medianMs: number | null;
+  jitterMs: number;
+  lossPct: number;
+}
 import { purposeOf } from "./netPurpose";
 import { enforced, useShaper } from "../store/shaper";
 
@@ -45,9 +53,31 @@ export class TauriBackend extends MockBackend {
   /** Real system metrics from the unprivileged monitor (Phase 3). */
   override onMetrics(cb: (m: Metrics) => void, rateHz: number): () => void {
     let alive = true;
+    // Live ping: one ICMP echo per tick to the game's server (or 1.1.1.1), with jitter as the
+    // change from the previous reply and loss over the last 20 probes.
+    let pingTarget = "1.1.1.1";
+    let targetAt = 0;
+    let lastRtt: number | null = null;
+    const recent: boolean[] = [];
+    const pingOnce = async (): Promise<Metrics["ping"]> => {
+      if (Date.now() - targetAt > 10_000) {
+        targetAt = Date.now();
+        pingTarget = await this.resolveTarget("auto").catch(() => "1.1.1.1");
+      }
+      const s = await invoke<ProbeStats>("net_probe", { target: pingTarget, count: 1, tcpPort: null }).catch(() => null);
+      const ok = !!s && s.received > 0 && s.medianMs !== null;
+      recent.push(ok);
+      while (recent.length > 20) recent.shift();
+      const loss = (100 * recent.filter((x) => !x).length) / recent.length;
+      if (!ok) return lastRtt === null ? null : { ms: lastRtt, jitter: 0, loss };
+      const ms = s!.medianMs!;
+      const jitter = lastRtt === null ? 0 : Math.abs(ms - lastRtt);
+      lastRtt = ms;
+      return { ms, jitter, loss };
+    };
     const tick = () =>
-      void invoke<SystemMetrics>("monitor_system")
-        .then((s) => {
+      void Promise.all([invoke<SystemMetrics>("monitor_system"), pingOnce()])
+        .then(([s, ping]) => {
           if (!alive) return;
           const g = s.gpu;
           cb({
@@ -66,7 +96,7 @@ export class TauriBackend extends MockBackend {
             },
             disk: { readMBs: s.diskReadMbs, writeMBs: s.diskWriteMbs, activePct: s.diskActivePct },
             net: { downKbps: s.netDownKbps, upKbps: s.netUpKbps },
-            ping: null,
+            ping,
             fps: null,
             notes: s.notes,
           });
@@ -299,6 +329,117 @@ export class TauriBackend extends MockBackend {
   override async restoreInternet(): Promise<void> {
     await invoke<ActionResult>("net_restore");
     useShaper.getState().setFocus(false);
+  }
+
+  /* ---------------- Quality, Route Lab, Multi Internet (Phase 7) ---------------- */
+
+  /** "auto" targets resolve to the running game's busiest server, else 1.1.1.1. */
+  private async resolveTarget(target: string): Promise<string> {
+    if (!/auto/i.test(target)) return target.trim();
+    const game = useLive.getState().runningGame;
+    if (game) {
+      const rows = await invoke<{ exe: string; topRemote: string | null }[]>("net_traffic").catch(() => []);
+      const remote = rows.find((r) => r.exe.toLowerCase() === game.exe.toLowerCase())?.topRemote;
+      if (remote) return remote.replace(/:\d+$/, "");
+    }
+    return "1.1.1.1";
+  }
+
+  private async probe(target: string, count: number): Promise<{ stats: ProbeStats; method: "ICMP" | "TCP" }> {
+    const icmp = await invoke<ProbeStats>("net_probe", { target, count, tcpPort: null });
+    if (icmp.received > 0) return { stats: icmp, method: "ICMP" };
+    return { stats: await invoke<ProbeStats>("net_probe", { target, count, tcpPort: 443 }), method: "TCP" };
+  }
+
+  override async runQualityTest(target: string, onProgress: (pct: number) => void): Promise<QualityResult> {
+    const host = await this.resolveTarget(target);
+    onProgress(5);
+    const idle = await this.probe(host, 12);
+    onProgress(35);
+    // Bufferbloat: latency while the link is busy. Uses Cloudflare's public speed-test endpoints
+    // (about 25 MB down, 10 MB up). If they are unreachable the loaded values stay empty.
+    const loaded = async (load: () => Promise<unknown>) => {
+      const [r] = await Promise.all([this.probe(host, 8).catch(() => null), load().catch(() => null)]);
+      return r?.stats.medianMs ?? Number.NaN;
+    };
+    const down = await loaded(async () => {
+      const res = await fetch("https://speed.cloudflare.com/__down?bytes=25000000", { cache: "no-store" });
+      await res.arrayBuffer();
+    });
+    onProgress(70);
+    const up = await loaded(() => fetch("https://speed.cloudflare.com/__up", { method: "POST", body: new Uint8Array(10_000_000) }));
+    onProgress(100);
+    return {
+      target: host,
+      method: idle.method,
+      pingMs: idle.stats.medianMs ?? Number.NaN,
+      jitterMs: idle.stats.jitterMs,
+      lossPct: idle.stats.lossPct,
+      idleMs: idle.stats.medianMs ?? Number.NaN,
+      loadedDownMs: down,
+      loadedUpMs: up,
+      dataUsedMB: 35,
+    };
+  }
+
+  override async traceroute(target: string): Promise<Hop[]> {
+    const host = await this.resolveTarget(target);
+    const hops = await invoke<{ n: number; ip: string | null; avgMs: number | null; lossPct: number; segment: Hop["segment"] }[]>("net_traceroute", { target: host });
+    // Network names need the offline DB-IP database, which is not bundled yet.
+    return hops.map((h) => ({ n: h.n, host: h.ip ?? "*", ip: h.ip ?? "*", asn: "-", avgMs: h.avgMs ?? 0, lossPct: h.lossPct, segment: h.segment }));
+  }
+
+  override async getAdapters(): Promise<Adapter[]> {
+    const rows = await invoke<{ luid: string; name: string; description: string; kind: string; up: boolean; hasGateway: boolean; metric: number; pingMs: number | null; lossPct: number | null }[]>("net_adapters");
+    const live = rows.filter((r) => r.up && r.hasGateway);
+    const best = live.length ? Math.min(...live.map((r) => r.metric)) : -1;
+    const kinds: Adapter["kind"][] = ["ethernet", "wifi", "ppp", "vpn", "other"];
+    return rows.map((r) => ({
+      id: r.luid,
+      name: r.description && r.description !== r.name ? `${r.name} (${r.description})` : r.name,
+      kind: r.kind === "mobile" ? "tether" : kinds.includes(r.kind as Adapter["kind"]) ? (r.kind as Adapter["kind"]) : "other",
+      connected: r.up && r.hasGateway,
+      pingMs: r.pingMs,
+      lossPct: r.lossPct,
+      metric: r.metric,
+      preferred: r.up && r.hasGateway && r.metric === best,
+    }));
+  }
+
+  override async preferAdapter(id: string | null): Promise<ActionResult> {
+    return invoke<ActionResult>("net_prefer", { luid: id, dryRun: useSettings.getState().dryRun });
+  }
+
+  override async getTuneFindings(): Promise<TuneFinding[]> {
+    const out: TuneFinding[] = [];
+    const sys = useLive.getState().system?.info;
+    const vpn = await invoke<string | null>("net_vpn").catch(() => null);
+    if (vpn) {
+      out.push({ id: "vpn", title: `${vpn} is carrying all your traffic`, detail: `Every route, ping and DNS result reflects ${vpn}, not your ISP directly. To compare, pause it and run the Quality Test again.`, severity: "warn", evidence: "documented" });
+    }
+    const kind = sys?.network?.kind;
+    if (kind === "wifi") out.push({ id: "link", title: "You are on Wi-Fi", detail: "Wi-Fi adds jitter compared with a cable. Use Ethernet for ranked games when you can.", severity: "info", evidence: "documented" });
+    else if (kind === "ppp" || kind === "mobile") out.push({ id: "link", title: "You are on a mobile or PPP connection", detail: "Mobile links vary with signal and tower load; expect more jitter than fixed broadband.", severity: "info", evidence: "documented" });
+    else if (kind === "ethernet") out.push({ id: "link", title: "You are on Ethernet", detail: "The most stable link type for games.", severity: "ok", evidence: "documented" });
+
+    const mtu = await invoke<number | null>("net_mtu", { target: "1.1.1.1" }).catch(() => null);
+    if (mtu === null) out.push({ id: "mtu", title: "Path MTU could not be measured", detail: "The test target did not answer ICMP.", severity: "info", evidence: "documented" });
+    else if (mtu >= 1400) out.push({ id: "mtu", title: `Path MTU ${mtu} works end to end`, detail: "No fragmentation problems to the test target.", severity: "ok", evidence: "documented" });
+    else out.push({ id: "mtu", title: `Path MTU is ${mtu}`, detail: "Lower than the usual 1500, typical of VPN tunnels and some mobile networks. Windows adapts automatically; no change needed unless games disconnect.", severity: "info", evidence: "documented" });
+
+    const dns = await invoke<string[]>("dns_current").catch(() => [] as string[]);
+    if (dns.some((d) => d.startsWith("127.") || d === "::1")) out.push({ id: "dns", title: "DNS is handled by a local app", detail: "A VPN or DNS app answers lookups on this PC. DNS only affects how fast connections start, not in-game ping.", severity: "info", evidence: "documented" });
+    else out.push({ id: "dns", title: "DNS", detail: "Compare resolvers in PC Boost → DNS Optimizer. DNS only affects how fast connections start, not in-game ping.", severity: "info", evidence: "documented" });
+
+    const tweaks = await invoke<{ id: string; state: string; reason: string | null }[]>("tweaks_status").catch(() => []);
+    const nic = tweaks.find((t) => t.id === "nic-power");
+    if (nic?.state === "applied") out.push({ id: "power", title: "Adapter power saving is off", detail: "The adapter will not sleep between packets.", severity: "ok", evidence: "documented" });
+    else if (nic?.state === "unsupported") out.push({ id: "power", title: "Adapter power saving", detail: nic.reason ?? "Not available for this connection.", severity: "info", evidence: "documented" });
+    else if (nic) out.push({ id: "power", title: "Adapter power saving is on", detail: "Windows may let the adapter sleep between packets, which can add small lag spikes.", severity: "warn", evidence: "documented", fixLabel: "Turn off power saving", fixTweak: "nic-power" });
+
+    out.push({ id: "bloat", title: "Bufferbloat", detail: "Run the Quality Test: it measures latency while downloading and uploading. A big rise means upload or download is saturating the link; capping background apps in Traffic Shaper usually fixes it.", severity: "info", evidence: "documented" });
+    out.push({ id: "nagle", title: "TCP acknowledgement tweaks", detail: "Most shooters use UDP, so Nagle/ACK changes are not expected to help them.", severity: "info", evidence: "experimental" });
+    return out;
   }
 
   /* ---------------- Library and Game Mode (Phase 5) ---------------- */

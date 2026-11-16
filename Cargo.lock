@@ -2626,6 +2626,7 @@ dependencies = [
  "ferrisetw",
  "hex",
  "otx-monitor",
+ "otx-net",
  "otx-protocol",
  "otx-sysinfo",
  "otx-tweaks",

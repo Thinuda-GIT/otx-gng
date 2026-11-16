@@ -34,6 +34,7 @@ export function Connections() {
   const [games, setGames] = useState<Game[]>([]);
   const [game, setGame] = useState("valorant");
   const [region, setRegion] = useState(REGIONS[0]!);
+  const [target, setTarget] = useState("auto");
   const [hops, setHops] = useState<Hop[] | null>(null);
   const [tracing, setTracing] = useState(false);
   const history = useLive((s) => s.history);
@@ -44,7 +45,11 @@ export function Connections() {
 
   const trace = async () => {
     setTracing(true);
-    setHops(await backend.traceroute(`${game}.${region.split(" ")[0]!.toLowerCase()}.example`));
+    try {
+      setHops(await backend.traceroute(target));
+    } catch (e) {
+      useUi.getState().toast({ tone: "error", title: "Route analysis failed", body: String(e) });
+    }
     setTracing(false);
   };
 
@@ -59,7 +64,9 @@ export function Connections() {
           <GlassSelect label="Game" value={game} onChange={setGame} options={games.map((g) => ({ value: g.id, label: g.name }))} />
         </div>
         <div>
-          <div className="mb-1 text-[13px] text-t2">Region</div>
+          <div className="mb-1 text-[13px] text-t2">Server ("auto" = the running game's server, else 1.1.1.1)</div>
+          <input className="otx-input mb-3 w-72" value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Server to analyze" />
+          <div className="mb-1 text-[13px] text-t2">Region (for community relays)</div>
           <GlassSelect label="Region" value={region} onChange={setRegion} options={REGIONS.map((r) => ({ value: r, label: r }))} />
         </div>
         <GlassButton kind="primary" icon={<Route size={16} />} loading={tracing} onClick={() => void trace()}>

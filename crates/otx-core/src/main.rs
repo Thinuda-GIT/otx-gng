@@ -16,6 +16,7 @@ mod boost;
 mod dns;
 mod install;
 mod journal;
+mod netif;
 mod process;
 mod ram;
 mod security;

@@ -494,6 +494,11 @@ export class MockBackend implements Backend {
     this.changes = this.changes.filter((c) => c.kind !== "firewall" && c.kind !== "qos");
   }
 
+  async preferAdapter(id: string | null): Promise<ActionResult> {
+    await sleep(300);
+    return { dryRun: false, changes: [id ? `Preferred ${id}` : "Back to automatic"], changeId: null };
+  }
+
   async getAdapters() {
     return MOCK_ADAPTERS.map((a) => ({ ...a, pingMs: a.pingMs === null ? null : jitter(a.pingMs, 0.15) }));
   }

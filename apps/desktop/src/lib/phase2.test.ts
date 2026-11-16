@@ -125,3 +125,14 @@ describe("Traffic Shaper and purpose labels", async () => {
     expect(purposeOf("random.exe", null)).toBe("unknown");
   });
 });
+
+describe("Failover decision", async () => {
+  const { failoverTarget } = await import("./useFailover");
+  const a = (id: string, o: Partial<import("../backend/types").Adapter>) => ({ id, name: id, kind: "ethernet" as const, connected: true, pingMs: 20, lossPct: 0, metric: 25, preferred: false, ...o });
+  it("switches only after three failed checks to a working connection", () => {
+    const list = [a("eth", { preferred: true, lossPct: 100 }), a("wifi", { kind: "wifi", lossPct: 0, pingMs: 30 }), a("warp", { kind: "vpn" })];
+    expect(failoverTarget(list, 2)).toBeNull();
+    expect(failoverTarget(list, 3)?.id).toBe("wifi");
+    expect(failoverTarget([list[0]!, a("wifi", { kind: "wifi", lossPct: 100 })], 5)).toBeNull();
+  });
+});

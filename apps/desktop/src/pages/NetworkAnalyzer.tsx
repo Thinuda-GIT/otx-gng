@@ -149,7 +149,11 @@ function QualityTest() {
     setRes(await backend.runQualityTest(target, setPct));
     setPct(null);
   };
-  const grade = res ? (res.loadedUpMs - res.idleMs < 30 ? "A" : res.loadedUpMs - res.idleMs < 60 ? "B" : res.loadedUpMs - res.idleMs < 120 ? "C" : "D") : null;
+  const ms = (v: number) => (Number.isFinite(v) ? `${v.toFixed(0)} ms` : "-");
+  const worst = res ? Math.max(Number.isFinite(res.loadedUpMs) ? res.loadedUpMs : res.idleMs, Number.isFinite(res.loadedDownMs) ? res.loadedDownMs : res.idleMs) : 0;
+  const rise = res ? worst - res.idleMs : 0;
+  const loadedKnown = !!res && (Number.isFinite(res.loadedUpMs) || Number.isFinite(res.loadedDownMs));
+  const grade = !res || !loadedKnown ? null : rise < 30 ? "A" : rise < 60 ? "B" : rise < 120 ? "C" : "D";
   return (
     <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
       <Panel title="Run a test">
@@ -158,7 +162,7 @@ function QualityTest() {
         </label>
         <input id="qt-target" className="otx-input mb-4" value={target} onChange={(e) => setTarget(e.target.value)} />
         <p className="mb-4 text-[13px] text-t2">
-          Ping, jitter and loss use ICMP, TCP and UDP probes (many game servers ignore ICMP). The bufferbloat part downloads and uploads for about 20 seconds and uses about 50 MB of data.
+          Ping, jitter and loss use ICMP, and TCP connects when the target ignores ICMP. The bufferbloat part downloads about 25 MB and uploads about 10 MB from Cloudflare's public speed-test servers (35 MB in total). "auto" uses the running game's server when one is detected.
         </p>
         <GlassButton kind="primary" icon={<Play size={16} />} loading={pct !== null} onClick={() => void run()}>
           Start test
@@ -175,19 +179,19 @@ function QualityTest() {
         ) : (
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-4">
-              <Stat label="Ping" value={`${res.pingMs.toFixed(0)} ms`} sub={`${res.method} probe`} color="var(--accent-cyan)" />
+              <Stat label="Ping" value={ms(res.pingMs)} sub={`${res.method} probe`} color="var(--accent-cyan)" />
               <Stat label="Jitter" value={`${res.jitterMs.toFixed(1)} ms`} />
               <Stat label="Loss" value={`${res.lossPct.toFixed(1)}%`} />
             </div>
             <div>
               <div className="mb-2 flex items-center gap-2">
                 <span className="font-medium text-t1">Bufferbloat</span>
-                <GlassBadge tone={grade === "A" || grade === "B" ? "ok" : "warn"}>Grade {grade}</GlassBadge>
+                {grade ? <GlassBadge tone={grade === "A" || grade === "B" ? "ok" : "warn"}>Grade {grade}</GlassBadge> : <GlassBadge tone="neutral">Load test unavailable</GlassBadge>}
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <Stat label="Idle" value={`${res.idleMs.toFixed(0)} ms`} />
-                <Stat label="While downloading" value={`${res.loadedDownMs.toFixed(0)} ms`} />
-                <Stat label="While uploading" value={`${res.loadedUpMs.toFixed(0)} ms`} color="var(--accent-amber)" />
+                <Stat label="Idle" value={ms(res.idleMs)} />
+                <Stat label="While downloading" value={ms(res.loadedDownMs)} />
+                <Stat label="While uploading" value={ms(res.loadedUpMs)} color="var(--accent-amber)" />
               </div>
             </div>
             <p className="text-[13px] text-t2">Data used: {res.dataUsedMB} MB.</p>
@@ -229,7 +233,16 @@ function TuneUp() {
                 <p className="mt-0.5 text-[13px] text-t2">{f.detail}</p>
               </div>
               {f.fixLabel && (
-                <GlassButton size="sm" icon={<Wrench size={14} />} onClick={() => toast({ tone: "ok", title: f.fixLabel!, body: "Preview only: the Core service applies this from Phase 7." })}>
+                <GlassButton
+                  size="sm"
+                  icon={<Wrench size={14} />}
+                  onClick={() => {
+                    if (!f.fixTweak) return;
+                    void backend.setTweak(f.fixTweak, true, false).then((r) =>
+                      toast(r.ok ? { tone: "ok", title: f.fixLabel!, body: r.changes.join("; ") } : { tone: "error", title: "Not changed", body: r.error }),
+                    );
+                  }}
+                >
                   {f.fixLabel}
                 </GlassButton>
               )}

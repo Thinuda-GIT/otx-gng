@@ -8,10 +8,12 @@ import { useSettings } from "../store/settings";
 import { useUi } from "../store/ui";
 import { useRamRoutine } from "./useRamRoutine";
 import { useGameWatcher } from "./useGameWatcher";
+import { useFailover } from "./useFailover";
 
 export function useDesktopIntegration(): void {
   useRamRoutine();
   useGameWatcher();
+  useFailover();
   const minimizeToTray = useSettings((s) => s.minimizeToTray);
   const restart = useSettings((s) => s.restartShortcut);
   const restore = useSettings((s) => s.restoreShortcut);

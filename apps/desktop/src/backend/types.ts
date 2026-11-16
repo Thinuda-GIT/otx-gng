@@ -216,7 +216,7 @@ export interface ShaperRule {
 export interface Adapter {
   id: string;
   name: string;
-  kind: "ethernet" | "wifi" | "tether";
+  kind: "ethernet" | "wifi" | "tether" | "ppp" | "vpn" | "other";
   connected: boolean;
   pingMs: number | null;
   lossPct: number | null;
@@ -265,6 +265,8 @@ export interface TuneFinding {
   severity: "ok" | "info" | "warn";
   evidence: Evidence;
   fixLabel?: string;
+  /** Tweak id the fix button applies (desktop app). */
+  fixTweak?: string;
 }
 
 export interface Backend {
@@ -313,6 +315,8 @@ export interface Backend {
   restoreInternet(): Promise<void>;
 
   getAdapters(): Promise<Adapter[]>;
+  /** Prefer one connection (Multi Internet), or null to return to automatic. */
+  preferAdapter(id: string | null): Promise<ActionResult>;
   runQualityTest(target: string, onProgress: (pct: number) => void): Promise<QualityResult>;
   traceroute(target: string): Promise<Hop[]>;
   getTuneFindings(): Promise<TuneFinding[]>;

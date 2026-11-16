@@ -102,6 +102,11 @@ pub enum Request {
     ApplyShaper { rules: Vec<ShaperRuleSpec>, dry_run: bool },
     /// Remove every firewall rule and QoS policy OTX.GNG added.
     RestoreInternet,
+    /// Prefer this connection (interface LUID as a decimal string); others become backups.
+    #[serde(rename_all = "camelCase")]
+    PreferAdapter { luid: String, dry_run: bool },
+    /// Return every connection to automatic metrics.
+    ClearAdapterPreference,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]

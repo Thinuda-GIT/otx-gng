@@ -8,6 +8,7 @@ mod boost;
 mod core_client;
 mod games;
 mod net;
+mod quality;
 
 use core_client::CoreClient;
 use otx_protocol::{
@@ -256,7 +257,13 @@ pub fn run() {
             net::net_traffic,
             net::net_connections,
             net::shaper_apply,
-            net::net_restore
+            net::net_restore,
+            quality::net_probe,
+            quality::net_traceroute,
+            quality::net_mtu,
+            quality::net_adapters,
+            quality::net_vpn,
+            quality::net_prefer
         ])
         .setup(|app| {
             build_tray(app)?;
