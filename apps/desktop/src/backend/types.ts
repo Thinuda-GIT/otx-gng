@@ -2,20 +2,23 @@
  *  Phase 1: MockBackend (realistic fake data). Phase 2+: TauriBackend talks to the Core service.
  *  From Phase 2 on these types are generated from the Rust `otx-protocol` crate (ts-rs). */
 
+import type { CoreConnection } from "./generated/CoreConnection";
+import type { SystemInfo } from "./generated/SystemInfo";
+
 export type Tier = 0 | 1 | 2;
 
-export interface SystemInfo {
-  os: { name: string; build: number; edition: string };
-  cpu: { model: string; cores: number; threads: number; hybrid: boolean; pCores?: number; eCores?: number };
-  gpus: { name: string; vendor: "nvidia" | "amd" | "intel" | "other"; vramMB: number; integrated: boolean }[];
-  ramMB: number;
-  disk: { model: string; kind: "nvme" | "ssd" | "hdd" };
-  formFactor: "laptop" | "desktop";
-  onBattery: boolean;
-  network: { kind: "ethernet" | "wifi"; name: string; linkMbps: number; wifiSignalPct?: number; band?: string };
-  powerPlan: "ultimate" | "high" | "balanced" | "saver" | "unknown";
+/** Generated from Rust (crates/otx-protocol) by ts-rs. Never edit the generated files by hand. */
+export type { SystemInfo, CoreConnection };
+export type { CoreStatus } from "./generated/CoreStatus";
+export type { GpuInfo } from "./generated/GpuInfo";
+export type { PowerPlan } from "./generated/PowerPlan";
+
+/** System facts plus where they came from. "mock" only in the browser preview. */
+export interface SystemSnapshot {
+  source: "core" | "local" | "mock";
+  info: SystemInfo;
+  /** Machine-wide plus current-user startup entries. */
   startupApps: number;
-  antiCheats: { name: string; service: string; running: boolean }[];
 }
 
 export interface Metrics {
@@ -278,7 +281,8 @@ export interface TuneFinding {
 
 export interface Backend {
   readonly kind: "mock" | "tauri";
-  getSystemInfo(): Promise<SystemInfo>;
+  getSystemInfo(): Promise<SystemSnapshot>;
+  getCoreConnection(): Promise<CoreConnection>;
   onMetrics(cb: (m: Metrics) => void, rateHz: number): () => void;
   getProcesses(): Promise<ProcessGroup[]>;
   setPriority(id: string, level: PriorityLevel): Promise<void>;

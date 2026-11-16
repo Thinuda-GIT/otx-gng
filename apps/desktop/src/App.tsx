@@ -16,6 +16,9 @@ import { Splash } from "./shell/Splash";
 import { DragStrip } from "./shell/TitleBar";
 import { TopBar } from "./shell/TopBar";
 import { Home } from "./pages/Home";
+import { FirstRun } from "./shell/FirstRun";
+import { useDesktopIntegration } from "./lib/useDesktopIntegration";
+import { tierFromGpus } from "./lib/glassQuality";
 
 // Pages other than Home are split into their own chunks to keep startup light.
 const pages: Record<PageId, React.LazyExoticComponent<() => React.JSX.Element> | (() => React.JSX.Element)> = {
@@ -36,7 +39,10 @@ export default function App() {
   const s = useSettings();
   const page = useUi((x) => x.page);
   const collapsed = useUi((x) => x.sidebarCollapsed);
-  const gpuTier = useLive((x) => x.gpuTier);
+  const webglTier = useLive((x) => x.gpuTier);
+  const system = useLive((x) => x.system);
+  // Real adapters (Core or local detection) beat the WebGL renderer guess.
+  const gpuTier = system && system.source !== "mock" && system.info.gpus.length > 0 ? tierFromGpus(system.info.gpus) : webglTier;
   // Rounded so App re-renders only when the backdrop load visibly changes, not on every sample.
   const load = useLive((x) => (x.latest ? Math.round(Math.max(x.latest.cpu, x.latest.gpu.d3)) / 100 : 0));
   const live = useLive.getState();
@@ -54,7 +60,7 @@ export default function App() {
     setting: s.glassQuality,
     gameRunning,
     gpuTier,
-    batterySaver: false, // reported by the Core service from Phase 2
+    batterySaver: system?.source !== "mock" && (system?.info.power.batterySaver ?? false),
     reduceTransparency,
   });
   // "While a game is in the foreground": a game runs and our window is not focused, or the window is hidden.
@@ -66,6 +72,10 @@ export default function App() {
     setRootAttr("data-lens", supportsLens() ? "on" : null);
     if (isTauri()) setRootAttr("data-tauri", "");
     void backend.getSystemInfo().then(live.setSystem);
+    // Core link: checked now and every 15 s (one tiny pipe round trip).
+    const checkCore = () => void backend.getCoreConnection().then(live.setCore).catch(() => undefined);
+    checkCore();
+    const coreTimer = setInterval(checkCore, 15_000);
     const onFocus = () => setFocused(true);
     const onBlur = () => setFocused(false);
     const onVis = () => setHidden(document.hidden);
@@ -73,6 +83,7 @@ export default function App() {
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVis);
     return () => {
+      clearInterval(coreTimer);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVis);
@@ -107,6 +118,7 @@ export default function App() {
   useEffect(() => setRootVar("--load", load.toFixed(2)), [load]);
 
   useSpecular(glass === "full" && !paused);
+  useDesktopIntegration();
 
   const doneSplash = useCallback(() => setSplash(false), []);
   const sidebarW = collapsed ? SIDEBAR_W.collapsed : SIDEBAR_W.open;
@@ -141,6 +153,7 @@ export default function App() {
         <TopBar left={sidebarW + 28} />
         <CommandPalette />
         <Toasts />
+        <FirstRun open={!splash && !s.firstRunDone} />
         <AnimatePresence>{splash && <Splash onDone={doneSplash} reduced={reduceMotion} />}</AnimatePresence>
       </div>
     </MotionConfig>

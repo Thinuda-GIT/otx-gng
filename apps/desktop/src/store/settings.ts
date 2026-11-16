@@ -22,6 +22,7 @@ export interface Settings {
   // Advanced
   hardwareMonitoring: boolean;
   restartShortcut: string;
+  restoreShortcut: string;
   redirectionMethod: "auto" | "firewall-qos" | "wireguard" | "windivert";
   // Appearance
   glassQuality: GlassQuality;
@@ -64,6 +65,7 @@ export const DEFAULT_SETTINGS: Settings = {
   accuracy: "medium",
   hardwareMonitoring: false,
   restartShortcut: "Shift+Ctrl+Q",
+  restoreShortcut: "Shift+Ctrl+Alt+R",
   redirectionMethod: "auto",
   glassQuality: "auto",
   reduceTransparency: "system",
@@ -134,7 +136,9 @@ export const useSettings = create<SettingsStore>()(
     }),
     {
       name: "otx-gng.settings",
-      version: 1,
+      version: 2,
+      // v1 → v2 adds restoreShortcut; missing keys fall back to defaults.
+      migrate: (persisted) => ({ ...DEFAULT_SETTINGS, ...(persisted as Partial<Settings>) }),
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => {
         const { set: _s, reset: _r, importJson: _i, ...rest } = s;

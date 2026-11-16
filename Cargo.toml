@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/otx-protocol",
+  "crates/otx-sysinfo",
+  "crates/otx-core",
+  "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+authors = ["Thinuda"]
+rust-version = "1.80"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

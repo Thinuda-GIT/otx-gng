@@ -1,0 +1,40 @@
+[package]
+name = "otx-core"
+description = "OTX.GNG Core: the privileged Windows service (LocalSystem). Owns every elevated action behind a strict allow-list."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "otx-core"
+path = "src/main.rs"
+
+[dependencies]
+otx-protocol = { version = "0.2.0", path = "../otx-protocol" }
+otx-sysinfo = { version = "0.2.0", path = "../otx-sysinfo" }
+anyhow = "1.0.104"
+hex = "0.4.3"
+rand = "0.9.5"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "signal"] }
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
+windows-service = "0.8.1"
+
+[dependencies.windows]
+version = "0.61.3"
+features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_System_Pipes",
+  "Win32_System_RemoteDesktop",
+  "Win32_System_Threading",
+]
+
+[dev-dependencies]
+tempfile = "3"

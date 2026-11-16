@@ -77,7 +77,7 @@ export function Home() {
       pingMs: latest.ping?.ms ?? null,
       jitterMs: latest.ping?.jitter ?? null,
       lossPct: latest.ping?.loss ?? null,
-      powerPlan: system.powerPlan,
+      powerPlan: system.info.power.plan,
       startupApps: system.startupApps,
     });
     // Recompute every 5 samples so the ring is calm, not jittery

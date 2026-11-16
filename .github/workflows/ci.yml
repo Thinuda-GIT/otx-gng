@@ -9,6 +9,20 @@ permissions:
   contents: read
 
 jobs:
+  rust:
+    name: Rust tests (protocol, sysinfo, core incl. named-pipe IPC)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --locked -p otx-protocol -p otx-sysinfo -p otx-core
+      - name: Generated TypeScript types are up to date
+        run: git diff --exit-code -- apps/desktop/src/backend/generated
+      - name: Hardware detection runs on the CI machine
+        run: cargo run --locked -p otx-sysinfo --example sysinfo
+
   ui:
     name: UI typecheck, tests, build
     runs-on: windows-latest
@@ -30,7 +44,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   shell:
-    name: Tauri shell compiles
+    name: Desktop app compiles (with Core sidecar)
     runs-on: windows-latest
     defaults:
       run:
@@ -44,10 +58,9 @@ jobs:
           cache-dependency-path: apps/desktop/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/desktop/src-tauri
       - run: npm ci
+      - run: npm run build:core:dev
       - run: npm run build
-      - name: cargo check
-        working-directory: apps/desktop/src-tauri
-        run: cargo check --locked
+      - name: cargo check (desktop app)
+        working-directory: .
+        run: cargo check --locked -p otx-gng

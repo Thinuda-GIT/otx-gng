@@ -10,28 +10,32 @@ import type {
   ProcessGroup,
   ShaperRule,
   SystemInfo,
+  SystemSnapshot,
   TuneFinding,
   Tweak,
 } from "./types";
 
-export const MOCK_SYSTEM: SystemInfo = {
-  os: { name: "Windows 11", build: 26100, edition: "Home" },
-  cpu: { model: "Intel Core i7-12700H", cores: 14, threads: 20, hybrid: true, pCores: 6, eCores: 8 },
-  gpus: [
-    { name: "NVIDIA GeForce RTX 3060 Laptop GPU", vendor: "nvidia", vramMB: 6144, integrated: false },
-    { name: "Intel Iris Xe Graphics", vendor: "intel", vramMB: 128, integrated: true },
-  ],
-  ramMB: 15_872,
-  disk: { model: "NVMe SSD 1 TB", kind: "nvme" },
-  formFactor: "laptop",
-  onBattery: false,
-  network: { kind: "wifi", name: "Wi-Fi", linkMbps: 866, wifiSignalPct: 72, band: "5 GHz" },
-  powerPlan: "balanced",
+export const MOCK_SYSTEM: SystemSnapshot = {
+  source: "mock",
   startupApps: 11,
-  antiCheats: [
-    { name: "Riot Vanguard", service: "vgc", running: true },
-    { name: "Easy Anti-Cheat", service: "EasyAntiCheat_EOS", running: false },
-  ],
+  info: {
+    os: { name: "Windows 11", build: 26100, ubr: 2314, displayVersion: "24H2", edition: "Core", supported: true },
+    cpu: { model: "Intel Core i7-12700H", cores: 14, threads: 20, hybrid: true, performanceCores: 6, efficiencyCores: 8 },
+    gpus: [
+      { name: "NVIDIA GeForce RTX 3060 Laptop GPU", vendor: "nvidia", dedicatedVramMb: 6144, integrated: false },
+      { name: "Intel Iris Xe Graphics", vendor: "intel", dedicatedVramMb: 128, integrated: true },
+    ],
+    ramMb: 15_872,
+    disk: { model: "NVMe SSD 1 TB", kind: "nvme", systemDrive: "C:" },
+    power: { formFactor: "laptop", onBattery: false, batterySaver: false, batteryPercent: 86, plan: "balanced" },
+    network: { kind: "wifi", name: "Wi-Fi", description: "Intel Wi-Fi 6 AX201", linkMbps: 866 },
+    startupAppsMachine: 4,
+    antiCheats: [
+      { name: "Riot Vanguard", service: "vgc", kernelDriver: false, running: true },
+      { name: "Easy Anti-Cheat (EOS)", service: "EasyAntiCheat_EOS", kernelDriver: false, running: false },
+    ],
+    unavailable: [],
+  },
 };
 
 const defaultProfile = (over: Partial<GameProfile> = {}): GameProfile => ({
@@ -161,12 +165,12 @@ export const MOCK_NOT_RECOMMENDED: Record<string, { label: string; when: (s: Sys
   "gpu-pref": [{ label: "This PC has no discrete GPU", when: (s) => !s.gpus.some((g) => !g.integrated) }],
   hags: [{ label: "Your GPU driver is older than 2021 or a game shows stutter after enabling it", when: () => false }],
   "perf-counters": [{ label: "You use monitoring tools from other vendors", when: () => false }],
-  "nic-power": [{ label: "Laptop running on battery", when: (s) => s.formFactor === "laptop" && s.onBattery }],
+  "nic-power": [{ label: "Laptop running on battery", when: (s) => s.power.formFactor === "laptop" && s.power.onBattery }],
   "game-dvr": [{ label: "You record clips with Game Bar", when: () => false }],
-  "core-unpark": [{ label: "Laptop (more heat and battery use)", when: (s) => s.formFactor === "laptop" }],
-  sysmain: [{ label: "Windows is installed on a hard disk (HDD)", when: (s) => s.disk.kind === "hdd" }],
+  "core-unpark": [{ label: "Laptop (more heat and battery use)", when: (s) => s.power.formFactor === "laptop" }],
+  sysmain: [{ label: "Windows is installed on a hard disk (HDD)", when: (s) => s.disk?.kind === "hdd" }],
   "search-index": [{ label: "You use Start menu, Outlook or file search often", when: () => false }],
-  "ultimate-plan": [{ label: "Laptop (more heat and battery use)", when: (s) => s.formFactor === "laptop" }],
+  "ultimate-plan": [{ label: "Laptop (more heat and battery use)", when: (s) => s.power.formFactor === "laptop" }],
   nagle: [{ label: "Your games use UDP (most shooters)", when: () => true }],
   "net-throttle": [{ label: "You stream or record while playing", when: () => false }],
 };

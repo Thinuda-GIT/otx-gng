@@ -119,6 +119,10 @@
     "about": "About",
     "dev": "Developer preview",
     "simulateGame": "Simulate a game in the foreground",
-    "simulateGameHint": "Phase 1 only. Tests glass auto-degrade, UI pausing and the live HUD without a real game."
+    "simulateGameHint": "Phase 1 only. Tests glass auto-degrade, UI pausing and the live HUD without a real game.",
+    "restoreShortcut": "Shortcut to restore normal internet",
+    "restoreShortcutHint": "Removes every OTX.GNG firewall rule and QoS limit at once, from anywhere.",
+    "core": "Core service",
+    "coreHelp": "The privileged Windows service that applies and reverts changes. It accepts only typed requests from this app."
   }
 }

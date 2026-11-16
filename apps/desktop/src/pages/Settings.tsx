@@ -9,6 +9,8 @@ import { useLive } from "../store/live";
 import { exportSettings, useSettings, type Accent } from "../store/settings";
 import { useUi } from "../store/ui";
 import { APP_VERSION } from "../shell/Sidebar";
+import { CoreBadge } from "../shell/CoreBadge";
+import type { CoreConnection, SystemSnapshot } from "../backend/types";
 
 /** Builds "Shift+Ctrl+Q"-style strings. Requires at least one modifier so plain typing is never stolen. */
 export function shortcutFromEvent(e: Pick<KeyboardEvent, "key" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey">): string | null {
@@ -37,7 +39,8 @@ export function Settings() {
   const glass = useLive((x) => x.glass);
   const gpuTier = useLive((x) => x.gpuTier);
   const system = useLive((x) => x.system);
-  const [capturing, setCapturing] = useState(false);
+  const core = useLive((x) => x.core);
+  const [capturing, setCapturing] = useState<null | "restartShortcut" | "restoreShortcut">(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [revertOpen, setRevertOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -51,11 +54,11 @@ export function Settings() {
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (e.key === "Escape") return setCapturing(false);
+      if (e.key === "Escape") return setCapturing(null);
       const sc = shortcutFromEvent(e);
       if (sc) {
-        s.set("restartShortcut", sc);
-        setCapturing(false);
+        s.set(capturing, sc);
+        setCapturing(null);
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -127,9 +130,15 @@ export function Settings() {
           <Panel title={t("settings.advanced")}>
             <ToggleRow label={t("settings.hardware")} help={t("settings.hardwareHint")} checked={s.hardwareMonitoring} onChange={(v) => s.set("hardwareMonitoring", v)} />
             <Divider />
-            <Row label={t("settings.shortcut")} hint={capturing ? t("settings.shortcutHint") : undefined}>
-              <GlassButton size="sm" icon={<Keyboard size={14} />} onClick={() => setCapturing(true)} aria-live="polite">
-                {capturing ? "Press keys…" : s.restartShortcut}
+            <Row label={t("settings.shortcut")} hint={capturing === "restartShortcut" ? t("settings.shortcutHint") : undefined}>
+              <GlassButton size="sm" icon={<Keyboard size={14} />} onClick={() => setCapturing("restartShortcut")} aria-live="polite">
+                {capturing === "restartShortcut" ? "Press keys…" : s.restartShortcut}
+              </GlassButton>
+            </Row>
+            <Divider />
+            <Row label={t("settings.restoreShortcut")} hint={capturing === "restoreShortcut" ? t("settings.shortcutHint") : t("settings.restoreShortcutHint")}>
+              <GlassButton size="sm" icon={<Keyboard size={14} />} onClick={() => setCapturing("restoreShortcut")} aria-live="polite">
+                {capturing === "restoreShortcut" ? "Press keys…" : s.restoreShortcut}
               </GlassButton>
             </Row>
             <Divider />
@@ -195,11 +204,15 @@ export function Settings() {
             <ToggleRow label={t("settings.sounds")} hint="Off by default." checked={s.uiSounds} onChange={(v) => s.set("uiSounds", v)} />
           </Panel>
 
+          <Panel title={t("settings.core")} help={t("settings.coreHelp")} right={<CoreBadge core={core} />}>
+            <CoreDetails core={core} system={system} />
+          </Panel>
+
           <Panel title={t("settings.compat")}>
             <div id="settings-compat" className="scroll-mt-28" />
             {system ? (
               <ul className="space-y-2">
-                {system.antiCheats.map((a) => (
+                {system.info.antiCheats.map((a) => (
                   <li key={a.service} className="flex items-center justify-between gap-3">
                     <span className="text-t1">
                       {a.name} <span className="num text-[12px] text-t2">({a.service})</span>
@@ -312,6 +325,35 @@ export function Settings() {
       >
         Every change OTX.GNG made is restored to the value saved before it. Your OTX.GNG preferences stay as they are.
       </GlassModal>
+    </div>
+  );
+}
+
+function CoreDetails({ core, system }: { core: CoreConnection | null; system: SystemSnapshot | null }) {
+  const st = core?.status;
+  return (
+    <div className="space-y-2 text-[13px] text-t2">
+      {st ? (
+        <ul className="space-y-1">
+          <li>
+            Version <span className="num text-t1">{st.coreVersion}</span> · protocol {st.protocol} · {st.mode === "service" ? "Windows service" : "developer console"}
+            {st.elevated ? "" : " (not elevated)"}
+          </li>
+          <li>Safe Mode: {st.safeMode ? "on (privileged modules disabled)" : "off"} · Dry run: {st.dryRun ? "on" : "off"}</li>
+          {st.recoveredChanges > 0 && <li className="text-warn">The watchdog undid {st.recoveredChanges} temporary change(s) left from the last session.</li>}
+        </ul>
+      ) : (
+        <p>
+          {core?.link === "notRunning"
+            ? "The Core service is not installed or not running. Read-only features still work; changes to Windows need the Core. Reinstalling OTX.GNG installs it."
+            : core?.message ?? "Checking…"}
+        </p>
+      )}
+      {system && (
+        <p>
+          Hardware facts: {system.source === "core" ? "from the Core service" : system.source === "local" ? "detected by the app (Core not reachable)" : "preview data"}.
+        </p>
+      )}
     </div>
   );
 }

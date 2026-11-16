@@ -6,9 +6,10 @@ Free, honest, measurable game boosting for Windows 10 and 11. Free up RAM, give 
 priority, tame background network use and lower lag, in a glass interface. No paywall, no
 account, no ads, no telemetry unless you opt in.
 
-> **Status: Phase 1 of 10, a UI preview on mock data.** Nothing on your PC is read or changed yet.
-> The amber "Preview data" chip in the top bar shows this. System features arrive from Phase 2 on.
-> See [PROGRESS.md](PROGRESS.md).
+> **Status: Phase 2 of 10.** The desktop app reads your real hardware and talks to the OTX.GNG
+> Core service over a secured pipe. The Core can't change anything yet, and most pages still show
+> preview data (the amber "Preview data" chip). See [PROGRESS.md](PROGRESS.md) and
+> [docs/SECURITY.md](docs/SECURITY.md).
 
 ## What it will do
 

@@ -22,8 +22,29 @@ licenses on every build from Phase 10 on (`license-checker` for npm, `cargo-deny
 | JetBrains Mono (via @fontsource) | 5.3.0 | SIL OFL 1.1 | Numbers |
 | Microsoft Edge WebView2 Runtime | evergreen | Microsoft redistribution terms (free) | Installed by the bootstrapper if missing; not bundled |
 
-The Rust crate tree (`tauri` and its transitive dependencies) is listed in full by
-`cargo about` / `cargo deny` from Phase 2 on, when the workspace gains its own crates.
+### Rust crates (direct dependencies, Phase 2)
+
+| Crate | Version | License | Use |
+|---|---|---|---|
+| tauri, tauri-build | 2.12.5 / 2.7.4 | Apache-2.0 OR MIT | Desktop shell |
+| tauri-plugin-autostart | 2.7.0 | Apache-2.0 OR MIT | Launch on startup (HKCU Run entry) |
+| tauri-plugin-global-shortcut | 2.4.1 | Apache-2.0 OR MIT | Global hotkeys |
+| tauri-plugin-single-instance | 2.5.5 | Apache-2.0 OR MIT | One running copy |
+| windows (windows-rs) | 0.61.3 | MIT OR Apache-2.0 | Win32 APIs |
+| windows-service | 0.8.1 | MIT OR Apache-2.0 | Service host and SCM control |
+| winreg | 0.56.0 | MIT | Registry reads |
+| tokio | 1.54 | MIT | Async named pipes |
+| serde, serde_json | 1.0 | MIT OR Apache-2.0 | JSON protocol |
+| ts-rs | 12.0.1 | MIT | Rust → TypeScript protocol types |
+| thiserror, anyhow | 2.0 / 1.0 | MIT OR Apache-2.0 | Errors |
+| tracing, tracing-subscriber, tracing-appender | 0.1 / 0.3 / 0.2 | MIT | Logging |
+| rand, hex | 0.9 / 0.4 | MIT OR Apache-2.0 | Session ids |
+| @tauri-apps/plugin-autostart (npm) | 2.7.0 | MIT OR Apache-2.0 | Autostart from the UI |
+
+**Full transitive tree (466 crates, checked with `cargo metadata` on 2026-11-16):** every crate is
+under MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib, Unlicense, CC0/MIT-0, Unicode-3.0, or MPL-2.0
+(7 crates pulled in by Tauri's HTML tooling). All are compatible with GPL-3.0-or-later; MPL-2.0 is
+file-level copyleft and explicitly GPL-compatible. No crate is unlicensed.
 
 ## Build tools only (not shipped)
 
@@ -41,10 +62,7 @@ The Rust crate tree (`tauri` and its transitive dependencies) is listed in full 
 
 | Component | License | Phase | Note |
 |---|---|---|---|
-| windows-rs (`windows` crate) | MIT OR Apache-2.0 | 2 | Win32/NT APIs |
-| windows-service | MIT OR Apache-2.0 | 2 | Service host |
 | ferrisetw | MIT OR Apache-2.0 | 3, 6 | ETW consumer |
-| ts-rs | MIT | 2 | Rust → TypeScript types |
 | PresentMon | MIT (verify at bundling) | 8 | Frame-time capture |
 | DB-IP Lite (country/ASN) | CC BY 4.0 (attribution required) | 6 | Offline IP database |
 | WinDivert (optional) | LGPL-3.0 (chosen option of LGPLv3/GPLv2 dual license) | 6 | Inbound limiter, off by default |

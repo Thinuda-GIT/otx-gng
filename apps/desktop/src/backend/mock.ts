@@ -6,6 +6,7 @@ import type {
   BoostSummary,
   ChangeRecord,
   Connection,
+  CoreConnection,
   DnsResult,
   DnsServer,
   Game,
@@ -49,7 +50,7 @@ let idSeq = 100;
 const nextId = (p: string) => `${p}-${++idSeq}`;
 
 export class MockBackend implements Backend {
-  readonly kind = "mock" as const;
+  readonly kind: "mock" | "tauri" = "mock";
 
   private gameRunning: Game | null = null;
   private tweakState = new Map<string, boolean>(
@@ -78,8 +79,12 @@ export class MockBackend implements Backend {
     return structuredClone(MOCK_SYSTEM);
   }
 
+  async getCoreConnection(): Promise<CoreConnection> {
+    return { link: "notRunning", message: "Browser preview: there is no Core service here.", status: null };
+  }
+
   onMetrics(cb: (m: Metrics) => void, rateHz: number): () => void {
-    const threads = MOCK_SYSTEM.cpu.threads;
+    const threads = MOCK_SYSTEM.info.cpu.threads;
     let cpu = 14;
     let gpu = 6;
     let ping = 31;
@@ -90,8 +95,8 @@ export class MockBackend implements Backend {
       gpu = walk(gpu, 5, g ? 78 : 2, g ? 98 : 18);
       ping = walk(ping, 2.5, 24, 48);
       for (let i = 0; i < threads; i++) cores[i] = walk(cores[i]!, 9, 1, i < 2 && g ? 98 : 88);
-      this.usedMB = walk(this.usedMB, 40, 8_000, MOCK_SYSTEM.ramMB - 900);
-      const total = MOCK_SYSTEM.ramMB;
+      this.usedMB = walk(this.usedMB, 40, 8_000, MOCK_SYSTEM.info.ramMb - 900);
+      const total = MOCK_SYSTEM.info.ramMb;
       cb({
         t: Date.now(),
         cpu,
@@ -168,7 +173,7 @@ export class MockBackend implements Backend {
     return MOCK_TWEAKS.map((t) => ({
       ...t,
       enabled: this.tweakState.get(t.id) ?? false,
-      notRecommendedIf: (MOCK_NOT_RECOMMENDED[t.id] ?? []).map((r) => ({ label: r.label, matches: r.when(MOCK_SYSTEM) })),
+      notRecommendedIf: (MOCK_NOT_RECOMMENDED[t.id] ?? []).map((r) => ({ label: r.label, matches: r.when(MOCK_SYSTEM.info) })),
     }));
   }
 
@@ -200,7 +205,7 @@ export class MockBackend implements Backend {
   }
 
   async getRamStatus(): Promise<RamStatus> {
-    const total = MOCK_SYSTEM.ramMB;
+    const total = MOCK_SYSTEM.info.ramMb;
     const available = total - this.usedMB;
     const availPct = (available / total) * 100;
     const commitPct = ((this.usedMB * 1.32) / (total + 4_096)) * 100;
@@ -223,7 +228,7 @@ export class MockBackend implements Backend {
 
   async cleanRam(methods: RamMethod[], trigger: RamCleanResult["trigger"]): Promise<RamCleanResult> {
     await sleep(900);
-    const before = MOCK_SYSTEM.ramMB - this.usedMB;
+    const before = MOCK_SYSTEM.info.ramMb - this.usedMB;
     let freed = 0;
     if (methods.includes("trimWorkingSets")) freed += jitter(900, 0.3);
     if (methods.includes("memoryPriority")) freed += jitter(120, 0.3);

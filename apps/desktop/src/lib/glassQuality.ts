@@ -34,6 +34,12 @@ export function classifyRenderer(renderer: string | null | undefined): GpuTier {
   return "unknown";
 }
 
+/** GPU tier from the real adapter list (Core or local DXGI detection). */
+export function tierFromGpus(gpus: readonly { integrated: boolean }[]): GpuTier {
+  if (gpus.length === 0) return "software";
+  return gpus.some((g) => !g.integrated) ? "discrete" : "integrated";
+}
+
 export function detectGpuTier(): GpuTier {
   try {
     const canvas = document.createElement("canvas");

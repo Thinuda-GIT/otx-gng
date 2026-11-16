@@ -4,160 +4,143 @@
 
 ## Where we are
 
-- **Step 0 (plan):** done. All 8 open questions were answered "defaults are fine".
-- **Phase 1 (Foundation + Glass UI on mock data):** done and verified in a browser. The Tauri shell
-  compiles (see "Phase 1 verification").
-- **Next:** Phase 2, the Core service, IPC, installer skeleton and real hardware info.
+- **Step 0 (plan):** done. Defaults accepted.
+- **Phase 1 (Glass UI on mock data):** done, committed (`b5c33a1`).
+- **Phase 2 (Core service + IPC + installer skeleton + real hardware info):** done. See "Phase 2 verification".
+- **Next:** Phase 3, Usage Monitor with real per-process CPU/RAM/disk/GPU, categorization, the
+  protected-process list, process actions (priority, EcoQoS, end task) and analyzer v1 on real data.
 
 ## Decisions (locked)
 
 | # | Decision |
 |---|---|
-| D1 | Stack: Tauri 2 + WebView2, React 19 + TypeScript + Vite 7 + Tailwind 4 + Motion 12 + Zustand 5 + TanStack Virtual + react-i18next. Custom canvas charts (no chart library). |
-| D2 | License: GPL-3.0-or-later. All current dependencies are MIT, ISC, Apache-2.0 or OFL-1.1. |
-| D3 | Repo at `C:\dev\otx-gng` (short path, no spaces). Dev server on port **1420** (5173 is used by another project on this PC). |
-| D4 | Two privileged/unprivileged halves: the **Core service** (LocalSystem, machine-scope changes only) and an unprivileged **User Agent** inside the Tauri process (HKCU, `SystemParametersInfo`, per-user tweaks). |
-| D5 | UI ↔ Core: named pipe `\\.\pipe\otx-gng-core-v1`, DACL = interactive user SID + SYSTEM, HMAC handshake, length-prefixed JSON frames, strict allow-list, PID + creation time to identify processes. Types generated from Rust with `ts-rs`. |
-| D6 | Tweaks are declarative JSON manifests run by one generic engine (check → snapshot → apply → verify → journal; revert from the snapshot, never a guessed default). |
-| D7 | Tweak 5 (performance counters): ships scoped (third-party extensible providers only), Experimental, never in a preset. Usage Monitor reads CPU/RAM/disk via `NtQuerySystemInformation`, so only GPU columns depend on PDH and they disable themselves with a reason if PDH fails. |
-| D8 | Tier 2 redirection: WireGuard-style split tunnel (`wireguard-nt`), only game-server ranges routed. Dual-path duplication must converge on ONE exit relay. Duplication is Experimental. |
-| D9 | No telemetry backend in v1. Crash reports are local, redacted, opt-in. |
-| D10 | IP geolocation/ASN: DB-IP Lite (CC BY 4.0). Not MaxMind (no redistribution). |
-| D11 | Frame-time capture: bundle the MIT-licensed PresentMon CLI (verify license at bundling time) instead of writing our own Present-event parser. |
-| D12 | Design-system CSS lives in `@layer components` / `@layer base` so Tailwind utilities always win (fixes `.glass { position: relative }` overriding `absolute`). |
-| D13 | Glass auto rule: reduce transparency → Off; manual setting wins; Auto → Off while a game runs, Off on software rendering, Lite on integrated GPU or battery saver, else Full. UI is "paused" (no animations, no chart redraw, no metric polling) when hidden, or when a game runs and our window is not focused. |
+| D1 | Stack: Tauri 2 + WebView2, React 19 + TypeScript + Vite 7 + Tailwind 4 + Motion 12 + Zustand 5 + TanStack Virtual + react-i18next. Custom canvas charts. |
+| D2 | License: GPL-3.0-or-later. Every npm and Rust dependency (466 crates) is GPL-compatible; see THIRD_PARTY_LICENSES.md. |
+| D3 | Repo at `C:\dev\otx-gng`. Dev server on port **1420** (5173 is used by another project on this PC). Cargo workspace at the repo root; `target/` is shared. |
+| D4 | Privileged/unprivileged split: **Core service** (`otx-core`, LocalSystem) for machine-scope changes; the **Tauri process** (normal user) hosts tray, hotkeys, autostart, per-user (HKCU/SPI) tweaks from Phase 4, and local read-only detection when the Core is down. |
+| D5 | IPC: pipe `\\.\pipe\otx-gng-core-v1`, DACL `D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;OW)(A;;0x12008b;;;IU)`, first-instance flag, remote clients rejected, `u32 LE + JSON` frames ≤ 1 MiB, typed `Request` enum = allow-list. |
+| D5a | **Changed from the Step 0 plan:** no HMAC key file. Authentication uses kernel-reported client identity (PID → exe path, session, user SID). In service mode the client must be `OTX.GNG.exe`/`otx-gng.exe` in the Core's own Program Files directory. A key file readable by the user adds nothing against same-user malware. Release UI builds verify the pipe server is the installed `otx-core.exe`. Rationale in docs/SECURITY.md. |
+| D6 | Tweaks are declarative manifests run by one generic engine (Phase 4). |
+| D7 | Tweak 5 (perf counters): scoped, Experimental, never in a preset; Usage Monitor CPU/RAM/disk via `NtQuerySystemInformation`, GPU via PDH. |
+| D8 | Tier 2: WireGuard-style split tunnel; dual paths converge on one exit relay. |
+| D9 | No telemetry backend in v1. |
+| D10 | IP geo/ASN: DB-IP Lite (CC BY 4.0). |
+| D11 | Frame capture: bundle the MIT PresentMon CLI (verify at bundling). |
+| D12 | Design-system CSS in `@layer components`/`@layer base` so Tailwind utilities win. |
+| D13 | Glass auto rule as before; Phase 2 feeds it REAL inputs: GPU tier from the detected adapters, battery saver from `GetSystemPowerStatus`. |
+| D14 | Protocol types are generated from Rust by ts-rs into `apps/desktop/src/backend/generated/` (`npm run gen:types`). `u64` fields are annotated `#[ts(type = "number")]`; a UI test fails if any generated type contains `bigint`. |
+| D15 | Data dir: `%ProgramData%\OTX.GNG` with a protected DACL (SYSTEM/Admins full, Users read). Unelevated dev console uses `%LOCALAPPDATA%\OTX.GNG\dev`. Logs roll daily in `logs\core.log`. |
+| D16 | Write-ahead journal (`journal.json`, atomic replace). The watchdog reverts temporary entries newest-first at Core start; failures are kept and retried; a corrupt journal is moved aside. Service restarts itself after a crash (5 s, 30 s). |
+| D17 | The Core ships as a Tauri sidecar (`externalBin`); NSIS hooks: stop before install, re-register and start after install, `revert-all` + remove on uninstall, stop-only on update (`/UPDATE` detection is UNVERIFIED until tested in a VM). |
+| D18 | Hotkeys are global and rebindable: restart connections `Shift+Ctrl+Q` (from your screenshot), restore normal internet `Shift+Ctrl+Alt+R` (chosen to avoid clashing with common app shortcuts). |
 
 ## Architecture state
 
 ```
-apps/desktop (Tauri 2 app)
-  src/            React UI. Backend interface → MockBackend (Phase 1). TauriBackend arrives in Phase 2.
-  src-tauri/      Rust shell: window + frameless chrome only. No privileged code yet.
-crates/           (Phase 2) otx-protocol, otx-sys, otx-tweaks, otx-monitor, otx-net, otx-core-service, otx-relay
+crates/otx-protocol   Typed IPC messages, framing, limits; ts-rs exports        (31 tests)
+crates/otx-sysinfo    Read-only detection: OS, CPU (P/E cores), GPUs (DXGI), RAM,
+                      system disk (IOCTL: NVMe/SSD/HDD + model), power/battery/plan,
+                      primary network link, startup entries (StartupApproved-aware),
+                      anti-cheat services. Example: `cargo run -p otx-sysinfo --example sysinfo`  (7 tests)
+crates/otx-core       Windows service + console mode, secured pipe server, kernel-based
+                      client auth, allow-list dispatcher, journal/watchdog, SCM install   (10 tests, 4 over a real pipe)
+apps/desktop/src-tauri  Tray, close-to-tray, single instance, autostart, global hotkeys,
+                      pipe client with server verification, local fallback detection
+apps/desktop/src      UI. TauriBackend = real system info + Core status; everything else
+                      still MockBackend until its phase. First-run wizard. Core panel in Settings.
 ```
 
-## File tree (Phase 1)
+## Phase 2 verification (real results on this PC)
 
-```
-otx-gng/
-├─ .github/workflows/ci.yml        typecheck, tests, build, npm audit; cargo check of the shell
-├─ .gitignore
-├─ LICENSE                         GPL-3.0 full text
-├─ PROGRESS.md  README.md  THIRD_PARTY_LICENSES.md
-└─ apps/desktop/
-   ├─ index.html  package.json  package-lock.json  tsconfig.json  vite.config.ts
-   ├─ public/logo.svg               original OTX.GNG mark (hex ring + chevron)
-   ├─ src/
-   │  ├─ main.tsx  App.tsx
-   │  ├─ styles/   tokens.css  glass.css  components.css  app.css
-   │  ├─ i18n/     index.ts  en.json
-   │  ├─ lib/      format  glassQuality  healthScore  analyzer  benchStats  search  tauri  dom
-   │  │            actions  useSpecular  logic.test.ts (33 tests)
-   │  ├─ store/    settings.ts (persisted)  ui.ts  live.ts
-   │  ├─ backend/  types.ts  mock.ts  mockData.ts  index.ts
-   │  ├─ design-system/  Glass  GlassButton  GlassToggle  GlassSegmented  controls (Slider, Select,
-   │  │            Tooltip, Badge, TierBadge, LensFilterDefs)  GlassModal  Toasts  GlassGauge
-   │  │            LiveChart (+Sparkline)  GlassTable  motion  index
-   │  ├─ shell/    Backdrop  TitleBar (DragStrip, WindowControls)  Sidebar  TopBar  CommandPalette  Splash  nav
-   │  ├─ components/ui.tsx           PageHeader, Panel, Stat, Row, ToggleRow, Divider, Empty, GameTile
-   │  └─ pages/    Home  PcBoost  UsageMonitor  Library  NetworkAnalyzer  TrafficShaper  Connections
-   │               CommunityServers  MultiInternet  BenchmarkLab  Settings
-   └─ src-tauri/
-      ├─ Cargo.toml  build.rs  tauri.conf.json
-      ├─ capabilities/default.json   window permissions only
-      ├─ icons/                      generated from public/logo.svg
-      └─ src/main.rs  src/lib.rs
-```
-
-## Phase 1 verification (real results)
-
-- `npx tsc --noEmit`: 0 errors.
-- `npx vitest run`: 33/33 tests pass (glass rule, health score, analyzer, benchmark statistics,
-  validation, palette ranking, settings import sanitising, shortcut capture).
-- `npm run build`: succeeds. The main chunk is about 517 kB (169 kB gzip) and every page is its own lazy chunk.
-- Browser preview at 1440×810: Home, PC Boost (all 3 tabs), Usage Monitor and the command palette
-  were checked by hand. The Boost pipeline animates step by step. "Simulate a running game" switches
-  glass to Off, removes the backdrop, tints the page with the game colour and fills the HUD. No console errors.
-- Bugs found and fixed during verification: CSS layer order (absolute positioning lost), a tint too faint
-  to read, truncated stats, a sparkline wired to the wrong series, and a port clash with another local project.
-- Tauri shell: `cargo build` (debug) succeeded in 2 min 33 s with Rust 1.99 and produced `otx-gng.exe`.
-  Smoke test: the window opens titled "OTX.GNG" and responds. The shell process used 35 MB (debug build).
-  WebView2 memory could not be attributed (other apps on this PC also use WebView2). Real UI memory
-  budgets are measured in Phase 10, not claimed now.
-- Also fixed: the HUD corner brackets collided with the glass `::before` layer and now use their own overlay element.
+- Rust: `cargo test -p otx-protocol -p otx-sysinfo -p otx-core` → 48 passed, including real
+  named-pipe tests: handshake, ping/status/system info, `runCommand` rejected as NOT_ALLOWED,
+  non-hello first frame → UNAUTHORIZED, protocol 99 → VERSION_MISMATCH, a client outside the
+  install directory refused by a production-mode Core, 2 MiB frame → connection closed.
+- UI: `tsc` clean; `vitest` 43 passed.
+- End to end: `otx-core console --dev` plus the real desktop app. The Core logged
+  `client authenticated … image=C:\dev\otx-gng\target\debug\otx-gng.exe` and served
+  `GetSystemInfo` and `GetStatus` over the pipe.
+- Hardware detection on this PC: Windows 11 26H2 (build 26300.9711, CoreSingleLanguage); AMD Ryzen 5 220
+  6 cores / 12 threads; NVIDIA GeForce RTX 5050 Laptop GPU (7.7 GB) + AMD Radeon 740M (integrated);
+  15.3 GB RAM; Micron NVMe; laptop, plugged in, 79%, Balanced plan; primary link "Mobitel" (PPP);
+  4 enabled startup entries; PunkBuster service running; Vanguard and BattlEye installed.
+- Installer: `npm run tauri build` produced `target\release\bundle\nsis\OTX.GNG_0.2.0_x64-setup.exe`
+  (2.04 MiB, SHA-256 `1998cd0abb703cbaa4ea9e2347de98cc0ed7a8e5d82366fc3db720a4df6ab170`, unsigned).
+  makensis compiled the service hooks, so LogicLib and FileFunc are available. Release binaries:
+  `otx-gng.exe` 4.0 MB and `otx-core.exe` 1.0 MB. The installer was NOT run on this PC.
+- Bugs found by verification and fixed: last CPU core dropped by the record-walk bounds check
+  (5/10 → 6/12); ts-rs mapped `u64` to `bigint`; a missing `Win32_Security` feature hidden by
+  Cargo feature unification; disabled startup entries were counted (37 → 4); PPP links showed as "other".
+- Side effect on this PC (expected): the elevated dev run created `C:\ProgramData\OTX.GNG` (logs +
+  empty journal) with its protected DACL. Nothing else was changed. The service was NOT installed.
 
 ## Requirements status (R1–R15)
 
 | Req | Status | Note |
 |---|---|---|
-| R1 RAM before launch | Partial | UI for RAM Cleaner, routine, allow list and history is done on mock data; the real purge comes in Phase 4/5 |
-| R2 CPU priority | Partial | UI done (profiles, process actions); real `SetPriorityClass` / CPU Sets in Phase 3/5 |
-| R3 Many boost features | Partial | All 20 tweak cards with risk, evidence and "not recommended if"; the engine comes in Phase 4 |
-| R4 Network per app / focus | Partial | Live Traffic, Connections, Traffic Shaper and Focus mode UIs; ETW + Firewall/QoS in Phase 6 |
-| R5 Network booster | Partial | Quality Test and Tune-up UIs; real probes in Phase 7 |
-| R6 Usage tabs | Partial | Charts, grouped virtualized table, process panel, analyzer v1 (logic real and tested; data mocked) |
-| R7 ExitLag-like IA, glass | Done (look) | Sidebar order, pages and settings structure match the brief; screenshots still needed for fine layout |
-| R8 Branding | Done | Splash, footer, About, sidebar, installer metadata. The tray tooltip comes in Phase 2 |
-| R9 Win10 + Win11 | Partial | In-app glass looks the same on both. Real version detection in Phase 2 |
-| R10 Gaming outcomes | Not started | Measured only, from Phases 3–9 |
-| R11 Screenshot pages | Done (on mock) | Sidebar, Preferences, PC Boost (System Tweaks / RAM Cleaner / DNS Optimizer) |
-| R12 Feature references | Ongoing | Ideas only; no copied code, names or art |
-| R13 100% free | Done so far | $0 toolchain, all licenses GPL-compatible, no services used |
-| R14 Liquid-glass UI | Done | One Glass primitive (blur, fill, masked edge light, inner highlight, pointer sheen, noise, tinted shadow), 4 variants, SVG lens refraction where supported, quality tiers with auto-degrade |
-| R15 Correct engineering | Ongoing | Strict TS, 33 unit tests, CI workflow; no privileged code yet |
+| R1 RAM before launch | Partial | UI on mock; the real purge comes in Phase 4/5 (Core journal ready) |
+| R2 CPU priority | Partial | UI on mock; real priority/CPU Sets in Phase 3/5. P/E-core detection is real now |
+| R3 Many features | Partial | 20 tweak cards (mock); engine in Phase 4 |
+| R4 Network per app | Partial | UI on mock; Phase 6 |
+| R5 Network booster | Partial | UI on mock; real primary-link detection done; Phase 7 |
+| R6 Usage tabs | Partial | UI on mock; Phase 3 |
+| R7 IA + glass | Done (look) | Screenshots still not received |
+| R8 Branding | Done | Now also tray tooltip and installer metadata |
+| R9 Win10 + Win11 | Partial | Real version detection (Windows 11 from build ≥ 22000; supported ≥ 19045). Not yet tested on Win10 |
+| R10 Outcomes | Not started | Measured only, Phases 3–9 |
+| R11 Screenshot pages | Done on mock | |
+| R12 References | Ongoing | |
+| R13 Free | Done so far | $0; all licenses GPL-compatible |
+| R14 Glass UI | Done | Auto-degrade now driven by real GPU and battery-saver facts |
+| R15 Engineering | Ongoing | Threat model, secured IPC, 91 automated tests, CI covers Rust + UI + generated-type drift |
 
-## UNVERIFIED (to check when the item is built)
+## UNVERIFIED
 
-- Verisign Public DNS (64.6.64.6) is still in service. The mock shows it failing every query to demonstrate how failure is reported.
-- `CSS.supports("backdrop-filter", "url(#id)")` and the visual result of SVG lens refraction inside
-  WebView2. This is a progressive enhancement that falls back to plain blur.
-- Window effects (Mica/Acrylic) are not enabled yet. Planned as a setting in Phase 2.
-- Exact launcher metadata formats for Battle.net, EA app and Xbox (Phase 5).
-- Policy-based QoS behaviour on Windows Home without a domain (Phase 6).
-- SignPath Foundation eligibility (Phase 10).
+- NSIS `/UPDATE` detection in the uninstall hook at runtime (the hook compiles; behaviour during a real update is untested).
+- Behaviour of the installed service on Windows 10 22H2 and a clean Windows 11 VM.
+- The global-hotkey parser's acceptance of "Shift+Ctrl+Alt+R" style strings (failures are reported to the user with a toast).
+- Earlier items: Verisign DNS availability, SVG lens refraction in WebView2, launcher formats, QoS on Home, SignPath eligibility.
 
-## Known limitations of Phase 1
+## Known limitations
 
-- Everything is mock data. Buttons that would change the system show "Preview only" toasts or change the mock state.
-- i18n: shell, navigation and Settings strings are in `en.json`. Page body copy is still inline English
-  and moves to resource files in the Phase 10 i18n pass.
-- Close button closes the app. Minimize-to-tray needs the tray (Phase 2).
-- Hardware sensor, battery-saver and real GPU signals come from the Core in Phase 2. Phase 1 uses the
-  WebGL renderer string for the GPU tier.
-- The first-run wizard needs real hardware detection, so it is scheduled with Phase 2.
-- Performance budgets (idle CPU, UI RAM) are not measured yet. That happens in Phase 10, and nothing is claimed before then.
+- Only system facts and Core status are real; every other page is still mock data ("Preview data" chip).
+- Ricochet (Call of Duty) has no persistent service, so it is detected per game in Phase 5, not here.
+- A desktop on a UPS that reports as a system battery would be shown as a laptop.
+- Startup-entry count covers Run keys (HKLM, HKLM WOW6432Node, HKCU) and not the Startup folder or scheduled tasks; Phase 3's startup manager adds those.
+- Close-to-tray hides the window; destroying the webview while a game runs (to save RAM) comes with game detection in Phase 5.
+- Tray "Game Mode" is disabled until Phase 5; "Boost now" opens Home.
 
-## Prerequisites
-
-Run in PowerShell **as Administrator**:
+## Run and test
 
 ```powershell
-winget install --id Git.Git -e
-winget install --id OpenJS.NodeJS.LTS -e
-winget install --id Rustlang.Rustup -e
-winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+# Terminal 1 (optional): the Core in developer mode, no install needed
+cd C:\dev\otx-gng
+cargo run -p otx-core -- console --dev
+
+# Terminal 2: the desktop app (builds the Core sidecar first, then opens the window)
+cd C:\dev\otx-gng\apps\desktop
+npm run tauri dev
+
+# Tests
+cd C:\dev\otx-gng; cargo test -p otx-protocol -p otx-sysinfo -p otx-core
+cd C:\dev\otx-gng\apps\desktop; npm test
+
+# What does OTX.GNG detect on this PC?
+cd C:\dev\otx-gng; cargo run -p otx-sysinfo --example sysinfo
+
+# Installer (release build; produces the NSIS setup .exe, does not install it)
+cd C:\dev\otx-gng\apps\desktop; npm run tauri build
 ```
 
-Then, in a normal PowerShell: `rustup default stable-x86_64-pc-windows-msvc`.
+Install the service only in a VM for now (elevated PowerShell): `otx-core.exe install`, `status`,
+`stop`, `uninstall`. Safe Mode: set the system environment variable `OTX_SAFE_MODE=1` and restart the service.
 
-## Manual test checklist (Phase 1)
+## Manual test checklist (Phase 2)
 
-1. `npm run dev`, open http://localhost:1420: the splash shows the branding line, then Home.
-2. Sidebar: every item navigates; the active item is a red glass capsule; the collapse button shrinks it to icons.
-3. Ctrl+K (or click the search pill): type "dns", press Enter → PC Boost.
-4. Home → Boost: the ring sweeps, steps tick one by one, the freed MB counts up, and a toast appears. "What OTX.GNG changed" lists the session.
-5. PC Boost → System Tweaks: turn on Dry run, toggle a tweak → a preview sheet lists exact values and nothing changes.
-   "Not recommended if…" on "Keep all CPU cores awake" shows "Applies to this PC" (the mock PC is a laptop).
-6. RAM Cleaner: Clean → a toast with measured before and after values; History gains an entry; Add app adds to the allow list.
-7. DNS Optimizer: Run benchmark → a ranked list with a "Fastest" badge; Verisign shows failures; Choose updates "In use".
-8. Settings: change Glass quality to Lite/Off; Reduce transparency On; accent colour; UI scale 120%; reload → settings persist. Export and re-import settings.
-9. Settings → Developer preview → Simulate a game: glass goes Off and Home shows the live HUD. Click outside the window → animations and charts pause.
-10. `npm run tauri dev`: a frameless window with 28 px corners; drag from the top strip, the top bar or the logo; minimize, maximize and close work.
-
-## Next: Phase 2
-
-Core service (`otx-core-service`, `windows-service` crate) + `otx-protocol` (ts-rs types) + pipe
-server/client with the handshake, the allow-list dispatcher skeleton, logging, the watchdog journal,
-NSIS hooks to install/stop/uninstall the service, the WebView2 bootstrapper, the tray and hotkeys,
-the first-run wizard with real hardware info (CPU, GPUs, RAM, disk type, laptop/desktop, adapter type,
-Windows version, anti-cheat services), and the TauriBackend for `getSystemInfo`.
+1. `npm run tauri dev` with no Core running → wizard step 2 shows your real hardware ("Detected by the app"); Settings → Core service shows "Not running".
+2. Start `otx-core console --dev`, reopen the app → wizard/Settings say "Detected by the Core service" and "Connected · developer console".
+3. Close the window → it hides to the tray; the tray icon tooltip shows the branding line; left-click reopens; Quit exits.
+4. Launch the app a second time → the first window comes to the front (single instance).
+5. Settings → Launch on Windows startup ON → Task Manager › Startup apps lists OTX.GNG; OFF removes it.
+6. Press Shift+Ctrl+Alt+R anywhere → "Normal internet restored" toast. Rebind it in Settings and try again.
+7. In a VM: run the installer → service "OTX.GNG Core" is running (services.msc), app shows "Connected"; uninstall → service gone.

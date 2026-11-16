@@ -1,0 +1,36 @@
+[package]
+name = "otx-sysinfo"
+description = "Read-only hardware and OS detection for OTX.GNG (no elevation required)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+otx-protocol = { version = "0.2.0", path = "../otx-protocol" }
+tracing = "0.1.44"
+windows-service = "0.8.1"
+winreg = "0.56.0"
+
+[dependencies.windows]
+version = "0.61.3"
+features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Dxgi",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Security",
+  "Win32_Networking_WinSock",
+  "Win32_Storage_FileSystem",
+  "Win32_System_IO",
+  "Win32_System_Ioctl",
+  "Win32_System_Power",
+  "Win32_System_Registry",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_System_Memory",
+]
+
+[dev-dependencies]
+serde_json = "1.0.154"

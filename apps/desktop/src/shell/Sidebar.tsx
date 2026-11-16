@@ -6,7 +6,7 @@ import { useUi } from "../store/ui";
 import { NAV } from "./nav";
 
 export const SIDEBAR_W = { open: 256, collapsed: 76 };
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.2.0";
 
 export function Sidebar() {
   const { t } = useTranslation();

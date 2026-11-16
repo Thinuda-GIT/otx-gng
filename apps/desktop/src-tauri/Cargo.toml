@@ -1,11 +1,11 @@
 [package]
 name = "otx-gng"
-version = "0.1.0"
 description = "OTX.GNG — free, honest, measurable game boosting for Windows"
-authors = ["Thinuda"]
-license = "GPL-3.0-or-later"
-edition = "2021"
-rust-version = "1.77"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
 
 # Library + thin binary is the layout Tauri 2 recommends.
 [lib]
@@ -16,11 +16,17 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+otx-protocol = { version = "0.2.0", path = "../../../crates/otx-protocol" }
+otx-sysinfo = { version = "0.2.0", path = "../../../crates/otx-sysinfo" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
+tokio = { version = "1.53.3", features = ["net", "io-util", "sync", "time"] }
+tracing = "0.1.44"
 
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = "s"
-panic = "abort"
-strip = true
+[dependencies.windows]
+version = "0.61.3"
+features = ["Win32_Foundation", "Win32_System_Pipes", "Win32_System_Threading"]
