@@ -9,6 +9,7 @@
 //! The file is replaced atomically (write to a temp file, then rename) so a crash mid-write
 //! never leaves a half-written journal.
 
+use otx_protocol::{PriorityLevel, ProcessRef};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -20,6 +21,10 @@ use std::path::{Path, PathBuf};
 pub enum RevertOp {
     /// No system state to restore. Used by tests and by the watchdog self-check.
     Marker { note: String },
+    /// Restore a process priority class (temporary; the process may have exited since).
+    ProcessPriority { target: ProcessRef, level: PriorityLevel },
+    /// Restore a process power-throttling (efficiency mode) state.
+    ProcessEfficiency { target: ProcessRef, control: u32, state: u32 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -28,6 +33,8 @@ pub struct Entry {
     pub id: String,
     pub created_unix: u64,
     pub title: String,
+    #[serde(default)]
+    pub detail: String,
     pub temporary: bool,
     pub revert: RevertOp,
 }
@@ -49,6 +56,12 @@ impl Reverter for SystemReverter {
                 tracing::info!(note, dry_run = self.dry_run, "revert marker");
                 Ok(())
             }
+            _ if self.dry_run => {
+                tracing::info!(?op, "dry run: would revert");
+                Ok(())
+            }
+            RevertOp::ProcessPriority { target, level } => crate::process::revert_priority(*target, *level),
+            RevertOp::ProcessEfficiency { target, control, state } => crate::process::revert_efficiency(*target, *control, *state),
         }
     }
 }
@@ -84,8 +97,7 @@ impl Journal {
         self.save()
     }
 
-    /// Remove an entry once its change has been reverted (used by per-item revert from Phase 4).
-    #[allow(dead_code)]
+    /// Remove an entry (when its apply step failed, or after a successful single revert).
     pub fn forget(&mut self, id: &str) -> std::io::Result<()> {
         self.entries.retain(|e| e.id != id);
         self.save()
@@ -138,7 +150,7 @@ mod tests {
     struct Rec(RefCell<Vec<String>>, bool);
     impl Reverter for Rec {
         fn revert(&self, op: &RevertOp) -> Result<(), String> {
-            let RevertOp::Marker { note } = op;
+            let RevertOp::Marker { note } = op else { return Ok(()) };
             self.0.borrow_mut().push(note.clone());
             if self.1 && note == "fail" {
                 Err("boom".into())
@@ -149,7 +161,7 @@ mod tests {
     }
 
     fn entry(id: &str, temporary: bool) -> Entry {
-        Entry { id: id.into(), created_unix: 0, title: id.into(), temporary, revert: RevertOp::Marker { note: id.into() } }
+        Entry { id: id.into(), created_unix: 0, title: id.into(), detail: String::new(), temporary, revert: RevertOp::Marker { note: id.into() } }
     }
 
     #[test]

@@ -6,7 +6,9 @@ import type {
   BoostSummary,
   ChangeRecord,
   Connection,
+  ActionResult,
   CoreConnection,
+  ProcessDetails,
   DnsResult,
   DnsServer,
   Game,
@@ -101,6 +103,7 @@ export class MockBackend implements Backend {
         t: Date.now(),
         cpu,
         perCore: [...cores],
+        gpuAvailable: true,
         gpu: { d3: gpu, compute: gpu * 0.08, copy: gpu * 0.12, videoDecode: g ? 0 : 3 + Math.random() * 4 },
         ram: {
           totalMB: total,
@@ -114,6 +117,7 @@ export class MockBackend implements Backend {
         net: { downKbps: jitter(g ? 160 : 21_000, 0.3), upKbps: jitter(g ? 90 : 2_700, 0.4) },
         ping: { ms: ping, jitter: Math.abs(jitter(3, 0.8)), loss: Math.random() < 0.08 ? 1 : 0 },
         fps: g ? { avg: jitter(212, 0.06), low1: jitter(141, 0.1) } : null,
+        notes: [],
       });
     };
     tick();
@@ -128,44 +132,73 @@ export class MockBackend implements Backend {
       .map(({ base, ...pr }) => {
         const cpu = Math.max(0, jitter(base.cpu, 0.5));
         const gpu = Math.max(0, jitter(base.gpu, 0.5));
+        const io = Math.max(0, jitter(base.disk, 0.6));
         return {
-          ...pr,
+          id: pr.id,
+          name: pr.name,
+          exe: pr.exe,
+          path: pr.path || null,
+          category: pr.category,
+          processes: pr.pids.map((pid) => ({ pid, createTime: "133795871234567890" })),
           cpu,
           gpu,
-          diskReadKBs: Math.max(0, jitter(base.disk, 0.6)),
-          diskWriteKBs: Math.max(0, jitter(base.disk * 0.3, 0.6)),
-          netDownKbps: Math.max(0, jitter(base.down, 0.4)),
-          netUpKbps: Math.max(0, jitter(base.up, 0.4)),
-          hog: pr.category !== "game" && (cpu > 4 || pr.wsMB > 1400 || base.up > 2000 || base.down > 10_000),
+          gpuEngine: base.gpu > 0 ? pr.gpuEngine : null,
+          memoryMb: pr.privateMB,
+          workingSetMb: pr.wsMB,
+          commitMb: pr.commitMB,
+          ioReadKbs: io,
+          ioWriteKbs: io * 0.3,
           priority: this.priorities.get(pr.id) ?? pr.priority,
-          eco: this.eco.has(pr.id),
+          sessionId: pr.category === "system" ? 0 : 1,
+          protected: pr.protected,
+          hog: pr.category !== "game" && (cpu > 4 || pr.wsMB > 1400 || io > 2000),
+          description: pr.description || null,
+          safeToClose: pr.safeToClose,
         };
       });
   }
 
-  async setPriority(id: string, level: PriorityLevel) {
-    await sleep(150);
-    this.guardProtected(id);
-    this.priorities.set(id, level);
-    this.log({ title: `Priority set to ${level}`, detail: id, kind: "priority", temporary: true });
+  async getProcessDetails(g: ProcessGroup): Promise<ProcessDetails> {
+    const pr = MOCK_PROCESSES.find((x) => x.id === g.id);
+    return {
+      path: g.path,
+      signer: pr?.signed ? pr.publisher : null,
+      signature: pr?.signed ? "valid" : "noEmbedded",
+      startup: pr?.startup ?? false,
+      efficiencyMode: this.eco.has(g.id),
+    };
   }
 
-  async setEfficiencyMode(id: string, on: boolean) {
+  async setPriority(g: ProcessGroup, level: PriorityLevel, dryRun: boolean): Promise<ActionResult> {
     await sleep(150);
-    this.guardProtected(id);
-    if (on) this.eco.add(id);
-    else this.eco.delete(id);
+    this.guardProtected(g);
+    const desc = `${g.exe}: priority → ${level}`;
+    if (!dryRun) {
+      this.priorities.set(g.id, level);
+      this.log({ title: desc, detail: `${g.processes.length} process(es)`, kind: "priority", temporary: true });
+    }
+    return { dryRun, changes: [desc], changeId: null };
   }
 
-  async endTask(id: string) {
+  async setEfficiencyMode(g: ProcessGroup, on: boolean, dryRun: boolean): Promise<ActionResult> {
+    await sleep(150);
+    this.guardProtected(g);
+    if (!dryRun) {
+      if (on) this.eco.add(g.id);
+      else this.eco.delete(g.id);
+    }
+    return { dryRun, changes: [`${g.exe}: efficiency mode ${on ? "on" : "off"}`], changeId: null };
+  }
+
+  async endTask(g: ProcessGroup, dryRun: boolean): Promise<ActionResult> {
     await sleep(250);
-    this.guardProtected(id);
-    this.ended.add(id);
+    this.guardProtected(g);
+    if (!dryRun) this.ended.add(g.id);
+    return { dryRun, changes: [`${g.exe} ended`], changeId: null };
   }
 
-  private guardProtected(id: string) {
-    const pr = MOCK_PROCESSES.find((x) => x.id === id);
-    if (pr?.protected) throw new Error("This process is protected and cannot be changed.");
+  private guardProtected(g: ProcessGroup) {
+    if (g.protected) throw new Error("This process is protected and cannot be changed.");
   }
 
   async getTweaks(): Promise<Tweak[]> {

@@ -169,6 +169,19 @@ pub fn dispatch(state: &CoreState, f: RequestFrame) -> ResponseFrame {
         Request::Ping => ResponseFrame::ok(f.id, Response::Pong),
         Request::GetStatus => ResponseFrame::ok(f.id, Response::Status(state.status())),
         Request::GetSystemInfo => ResponseFrame::ok(f.id, Response::SystemInfo(state.system_info())),
+        Request::ListChanges => ResponseFrame::ok(f.id, crate::actions::list_changes(state)),
+        Request::SetProcessPriority { target, level, dry_run } => result(f.id, crate::actions::set_priority(state, target, level, dry_run)),
+        Request::SetEfficiencyMode { target, on, dry_run } => result(f.id, crate::actions::set_efficiency(state, target, on, dry_run)),
+        Request::EndProcess { target, dry_run } => result(f.id, crate::actions::end_process(state, target, dry_run)),
+        Request::RevertChange { id } => result(f.id, crate::actions::revert(state, Some(&id))),
+        Request::RevertAll => result(f.id, crate::actions::revert(state, None)),
+    }
+}
+
+fn result(id: u32, r: Result<Response, crate::process::ActionError>) -> ResponseFrame {
+    match r {
+        Ok(resp) => ResponseFrame::ok(id, resp),
+        Err(e) => ResponseFrame::err(id, e.code, e.message),
     }
 }
 

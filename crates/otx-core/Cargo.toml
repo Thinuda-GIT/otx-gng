@@ -24,6 +24,7 @@ tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
 windows-service = "0.8.1"
+otx-monitor = { version = "0.2.0", path = "../otx-monitor" }
 
 [dependencies.windows]
 version = "0.61.3"

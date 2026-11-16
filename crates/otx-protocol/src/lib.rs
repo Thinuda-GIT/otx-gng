@@ -60,6 +60,57 @@ pub enum Request {
     GetStatus,
     /// Hardware and OS facts (read-only).
     GetSystemInfo,
+    /// Change a process's CPU priority class. Realtime is not representable.
+    #[serde(rename_all = "camelCase")]
+    SetProcessPriority { target: ProcessRef, level: PriorityLevel, dry_run: bool },
+    /// Turn Windows efficiency mode (EcoQoS power throttling) on or off for a process.
+    #[serde(rename_all = "camelCase")]
+    SetEfficiencyMode { target: ProcessRef, on: bool, dry_run: bool },
+    /// End a process (not reversible; the UI must confirm first).
+    #[serde(rename_all = "camelCase")]
+    EndProcess { target: ProcessRef, dry_run: bool },
+    /// Everything in the change journal.
+    ListChanges,
+    /// Undo one journaled change.
+    RevertChange { id: String },
+    /// Undo every journaled change ("Revert everything").
+    RevertAll,
+}
+
+/// A process identified by PID AND creation time, so a recycled PID can never be targeted.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProcessRef {
+    pub pid: u32,
+    /// FILETIME of process creation (100 ns ticks since 1601), as a decimal string because
+    /// it exceeds the 2^53 range of JavaScript numbers.
+    #[serde(with = "u64_string")]
+    #[ts(type = "string")]
+    pub create_time: u64,
+}
+
+/// Priority classes OTX.GNG may set. There is deliberately no Realtime variant.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum PriorityLevel {
+    Idle,
+    BelowNormal,
+    Normal,
+    AboveNormal,
+    High,
+}
+
+mod u64_string {
+    use serde::{Deserialize, Deserializer, Serializer};
+    pub fn serialize<S: Serializer>(v: &u64, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&v.to_string())
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<u64, D::Error> {
+        let s = String::deserialize(d)?;
+        s.parse().map_err(serde::de::Error::custom)
+    }
 }
 
 /// A Core → client frame.
@@ -88,6 +139,159 @@ pub enum Response {
     Pong,
     Status(CoreStatus),
     SystemInfo(SystemInfo),
+    /// Result of a process action or revert.
+    Action(ActionResult),
+    Changes(Vec<ChangeEntry>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ActionResult {
+    pub dry_run: bool,
+    /// Human-readable description of each value that changed (or would change).
+    pub changes: Vec<String>,
+    /// Journal id when the change can be reverted.
+    pub change_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ChangeEntry {
+    pub id: String,
+    #[ts(type = "number")]
+    pub created_unix: u64,
+    pub title: String,
+    pub detail: String,
+    /// Temporary changes are reverted automatically when the session ends or after a reboot.
+    pub temporary: bool,
+}
+
+// ---------------------------------------------------------------------------------------------
+// Live monitoring (produced by the unprivileged app; no elevation needed)
+// ---------------------------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GpuEngines {
+    pub d3: f32,
+    pub compute: f32,
+    pub copy: f32,
+    pub video_decode: f32,
+    pub video_encode: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SystemMetrics {
+    #[ts(type = "number")]
+    pub t_ms: u64,
+    pub cpu: f32,
+    pub per_core: Vec<f32>,
+    /// None when the GPU performance counters are unavailable (reason in `notes`).
+    pub gpu: Option<GpuEngines>,
+    #[ts(type = "number")]
+    pub ram_total_mb: u64,
+    #[ts(type = "number")]
+    pub ram_available_mb: u64,
+    #[ts(type = "number")]
+    pub commit_mb: u64,
+    #[ts(type = "number")]
+    pub commit_limit_mb: u64,
+    pub standby_mb: Option<f64>,
+    pub disk_read_mbs: Option<f32>,
+    pub disk_write_mbs: Option<f32>,
+    pub disk_active_pct: Option<f32>,
+    pub net_down_kbps: f32,
+    pub net_up_kbps: f32,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ProcessCategory {
+    Game,
+    Launcher,
+    Browser,
+    Voice,
+    System,
+    Background,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum SafeToClose {
+    Yes,
+    Caution,
+    No,
+}
+
+/// One app: every process with the same executable, merged.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProcessGroup {
+    /// Lower-case executable name (the grouping key).
+    pub id: String,
+    pub name: String,
+    pub exe: String,
+    pub path: Option<String>,
+    pub category: ProcessCategory,
+    pub processes: Vec<ProcessRef>,
+    /// Share of total CPU capacity (0-100, all cores), like Task Manager.
+    pub cpu: f32,
+    pub gpu: f32,
+    pub gpu_engine: Option<String>,
+    /// Private working set ("Memory" in Task Manager).
+    pub memory_mb: f32,
+    pub working_set_mb: f32,
+    /// Private commit.
+    pub commit_mb: f32,
+    /// All I/O the process performs (files, devices, network), per second.
+    pub io_read_kbs: f32,
+    pub io_write_kbs: f32,
+    /// Base priority class of the main (first) process.
+    pub priority: Option<PriorityLevel>,
+    pub session_id: u32,
+    pub protected: bool,
+    pub hog: bool,
+    pub description: Option<String>,
+    pub safe_to_close: SafeToClose,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum SignatureState {
+    /// Embedded signature verified by Windows.
+    Valid,
+    /// Embedded signature present but not trusted (tampered, expired root, untrusted signer).
+    Invalid,
+    /// No embedded signature. Windows' own files are usually signed through system catalogs
+    /// instead, which this check does not cover, so this is NOT proof the file is unsigned.
+    NoEmbedded,
+    /// The file could not be read.
+    Unknown,
+}
+
+/// On-demand details for the "What is this process?" panel.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ProcessDetails {
+    pub path: Option<String>,
+    /// Signer from the file's embedded Authenticode signature, when it is valid.
+    pub signer: Option<String>,
+    pub signature: SignatureState,
+    /// Registered to start with Windows (Run keys).
+    pub startup: bool,
+    pub efficiency_mode: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
@@ -451,6 +655,23 @@ mod tests {
         let back: ResponseFrame = decode(&bytes[4..]).unwrap();
         assert_eq!(back, f);
         assert!(check_len(((MAX_FRAME + 1) as u32).to_le_bytes()).is_err());
+    }
+
+    #[test]
+    fn process_refs_carry_64_bit_create_times_as_strings() {
+        let raw = br#"{"id":4,"method":"setProcessPriority","params":{"target":{"pid":42,"createTime":"133795871234567890"},"level":"belowNormal","dryRun":true}}"#;
+        let f: RequestFrame = decode(raw).unwrap();
+        assert_eq!(
+            f.request,
+            Request::SetProcessPriority {
+                target: ProcessRef { pid: 42, create_time: 133_795_871_234_567_890 },
+                level: PriorityLevel::BelowNormal,
+                dry_run: true
+            }
+        );
+        // Realtime does not exist in the protocol.
+        let rt = br#"{"id":4,"method":"setProcessPriority","params":{"target":{"pid":42,"createTime":"1"},"level":"realtime","dryRun":false}}"#;
+        assert!(decode::<RequestFrame>(rt).is_err());
     }
 
     #[test]

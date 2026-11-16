@@ -73,7 +73,7 @@ export function Home() {
       commitPct: (latest.ram.commitMB / latest.ram.commitLimitMB) * 100,
       backgroundCpuPct: running ? Math.max(0, latest.cpu - 38) : latest.cpu * 0.6,
       backgroundGpuPct: running ? 2 : latest.gpu.d3 * 0.7,
-      diskActivePct: latest.disk.activePct,
+      diskActivePct: latest.disk.activePct ?? 0,
       pingMs: latest.ping?.ms ?? null,
       jitterMs: latest.ping?.jitter ?? null,
       lossPct: latest.ping?.loss ?? null,

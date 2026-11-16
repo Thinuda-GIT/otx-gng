@@ -19,8 +19,7 @@ pub struct CoreState {
     pub data_dir: PathBuf,
     pub started: Instant,
     pub recovered_changes: u32,
-    /// Write-ahead change journal. The tweak, RAM and network modules (Phase 4+) record into it.
-    #[allow(dead_code)]
+    /// Write-ahead change journal.
     pub journal: Mutex<Journal>,
     /// System info is cached briefly: it is cheap but not free (disk IOCTLs, DXGI).
     sysinfo_cache: Mutex<Option<(Instant, SystemInfo)>>,

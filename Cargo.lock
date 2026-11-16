@@ -2520,6 +2520,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "hex",
+ "otx-monitor",
  "otx-protocol",
  "otx-sysinfo",
  "rand",
@@ -2538,6 +2539,7 @@ dependencies = [
 name = "otx-gng"
 version = "0.2.0"
 dependencies = [
+ "otx-monitor",
  "otx-protocol",
  "otx-sysinfo",
  "serde",
@@ -2550,6 +2552,18 @@ dependencies = [
  "tokio",
  "tracing",
  "windows 0.61.3",
+]
+
+[[package]]
+name = "otx-monitor"
+version = "0.2.0"
+dependencies = [
+ "otx-protocol",
+ "serde",
+ "serde_json",
+ "tracing",
+ "windows 0.61.3",
+ "winreg",
 ]
 
 [[package]]

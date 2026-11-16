@@ -4,6 +4,10 @@
 
 import type { CoreConnection } from "./generated/CoreConnection";
 import type { SystemInfo } from "./generated/SystemInfo";
+import type { ProcessGroup } from "./generated/ProcessGroup";
+import type { PriorityLevel } from "./generated/PriorityLevel";
+import type { ProcessDetails } from "./generated/ProcessDetails";
+import type { ActionResult } from "./generated/ActionResult";
 
 export type Tier = 0 | 1 | 2;
 
@@ -21,48 +25,32 @@ export interface SystemSnapshot {
   startupApps: number;
 }
 
+/** UI-side metrics (mapped from the generated SystemMetrics in the desktop app). */
 export interface Metrics {
   t: number;
   cpu: number;
   perCore: number[];
+  /** False when the GPU performance counters are unavailable; values are then 0. */
+  gpuAvailable: boolean;
   gpu: { d3: number; compute: number; copy: number; videoDecode: number };
-  ram: { totalMB: number; usedMB: number; availableMB: number; commitMB: number; commitLimitMB: number; standbyMB: number };
-  disk: { readMBs: number; writeMBs: number; activePct: number };
+  ram: { totalMB: number; usedMB: number; availableMB: number; commitMB: number; commitLimitMB: number; standbyMB: number | null };
+  disk: { readMBs: number | null; writeMBs: number | null; activePct: number | null };
   net: { downKbps: number; upKbps: number };
+  /** Measured against the game server from Phase 7; null until then. */
   ping: { ms: number; jitter: number; loss: number } | null;
+  /** Frame-time capture from Phase 8; null until then. */
   fps: { avg: number; low1: number } | null;
+  notes: string[];
 }
 
-export type ProcessCategory = "game" | "launcher" | "browser" | "system" | "background" | "unknown";
-export type PriorityLevel = "idle" | "below" | "normal" | "above" | "high";
-
-export interface ProcessGroup {
-  id: string;
-  name: string;
-  exe: string;
-  category: ProcessCategory;
-  pids: number[];
-  cpu: number;
-  gpu: number;
-  gpuEngine: string;
-  wsMB: number;
-  privateMB: number;
-  commitMB: number;
-  diskReadKBs: number;
-  diskWriteKBs: number;
-  netDownKbps: number;
-  netUpKbps: number;
-  protected: boolean;
-  hog: boolean;
-  publisher: string;
-  signed: boolean;
-  description: string;
-  path: string;
-  startup: boolean;
-  safeToClose: "yes" | "no" | "caution";
-  priority: PriorityLevel;
-  eco: boolean;
-}
+export type { ProcessGroup } from "./generated/ProcessGroup";
+export type { ProcessCategory } from "./generated/ProcessCategory";
+export type { PriorityLevel } from "./generated/PriorityLevel";
+export type { ProcessRef } from "./generated/ProcessRef";
+export type { ProcessDetails } from "./generated/ProcessDetails";
+export type { SignatureState } from "./generated/SignatureState";
+export type { ActionResult } from "./generated/ActionResult";
+export type { SystemMetrics } from "./generated/SystemMetrics";
 
 export type Risk = "safe" | "moderate" | "advanced";
 export type Evidence = "documented" | "community" | "experimental";
@@ -285,9 +273,11 @@ export interface Backend {
   getCoreConnection(): Promise<CoreConnection>;
   onMetrics(cb: (m: Metrics) => void, rateHz: number): () => void;
   getProcesses(): Promise<ProcessGroup[]>;
-  setPriority(id: string, level: PriorityLevel): Promise<void>;
-  setEfficiencyMode(id: string, on: boolean): Promise<void>;
-  endTask(id: string): Promise<void>;
+  getProcessDetails(g: ProcessGroup): Promise<ProcessDetails>;
+  /** Applied to every process of the app; protected or inaccessible ones are reported, not hidden. */
+  setPriority(g: ProcessGroup, level: PriorityLevel, dryRun: boolean): Promise<ActionResult>;
+  setEfficiencyMode(g: ProcessGroup, on: boolean, dryRun: boolean): Promise<ActionResult>;
+  endTask(g: ProcessGroup, dryRun: boolean): Promise<ActionResult>;
 
   getTweaks(): Promise<Tweak[]>;
   setTweak(id: string, enabled: boolean, dryRun: boolean): Promise<TweakApplyResult>;

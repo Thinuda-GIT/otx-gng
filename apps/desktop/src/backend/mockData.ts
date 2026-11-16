@@ -66,9 +66,28 @@ export const MOCK_GAMES: Game[] = [
   { id: "roblox", name: "Roblox", launcher: "manual", exe: "RobloxPlayerBeta.exe", installPath: "C:\\Users\\Player\\AppData\\Local\\Roblox", sizeGB: 0.9, lastPlayed: now - 5 * DAY, tint: "235 235 245", antiCheat: "Hyperion", engine: "other", profile: defaultProfile({ cpuPriority: "above" }) },
 ];
 
-type Proc = Omit<ProcessGroup, "cpu" | "gpu" | "diskReadKBs" | "diskWriteKBs" | "netDownKbps" | "netUpKbps" | "hog"> & {
+/** Mock-only process record; converted to the protocol ProcessGroup by MockBackend. */
+export interface Proc {
+  id: string;
+  name: string;
+  exe: string;
+  category: ProcessGroup["category"];
+  pids: number[];
+  gpuEngine: string;
+  wsMB: number;
+  privateMB: number;
+  commitMB: number;
+  protected: boolean;
+  publisher: string;
+  signed: boolean;
+  description: string;
+  path: string;
+  startup: boolean;
+  safeToClose: "yes" | "no" | "caution";
+  priority: "idle" | "belowNormal" | "normal" | "aboveNormal" | "high";
+  eco: boolean;
   base: { cpu: number; gpu: number; disk: number; down: number; up: number };
-};
+}
 
 const p = (
   id: string,

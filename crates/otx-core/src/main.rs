@@ -11,8 +11,10 @@
 //! Safe Mode (`--safe-mode` or env OTX_SAFE_MODE=1) disables every privileged module; the
 //! Core still answers status and read-only queries. Dry run (`--dry-run`) logs what would change.
 
+mod actions;
 mod install;
 mod journal;
+mod process;
 mod security;
 mod server;
 mod state;

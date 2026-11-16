@@ -16,6 +16,7 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+otx-monitor = { version = "0.2.0", path = "../../../crates/otx-monitor" }
 otx-protocol = { version = "0.2.0", path = "../../../crates/otx-protocol" }
 otx-sysinfo = { version = "0.2.0", path = "../../../crates/otx-sysinfo" }
 serde = { version = "1.0.229", features = ["derive"] }

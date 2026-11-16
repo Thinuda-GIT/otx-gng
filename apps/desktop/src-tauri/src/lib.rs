@@ -7,7 +7,10 @@
 mod core_client;
 
 use core_client::CoreClient;
-use otx_protocol::{CoreConnection, InfoSource, Request, Response, SystemSnapshot};
+use otx_protocol::{
+    ActionResult, ChangeEntry, CoreConnection, InfoSource, PriorityLevel, ProcessDetails, ProcessGroup, ProcessRef, Request, Response,
+    SignatureState, SystemMetrics, SystemSnapshot,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -20,6 +23,8 @@ pub const BRAND_LINE: &str = "OTX.GNG — Built and performed by Thinuda";
 #[derive(Default)]
 struct AppState {
     core: CoreClient,
+    /// Unprivileged live monitor (no handles to other processes are opened).
+    monitor: std::sync::Arc<Mutex<Option<otx_monitor::Monitor>>>,
     close_to_tray: AtomicBool,
     /// Shortcut string → action id, so the global handler knows what was pressed.
     shortcuts: Mutex<Vec<(Shortcut, String)>>,
@@ -51,6 +56,84 @@ async fn get_system_info(state: tauri::State<'_, AppState>) -> Result<SystemSnap
 #[tauri::command]
 async fn core_connection(state: tauri::State<'_, AppState>) -> Result<CoreConnection, String> {
     Ok(state.core.connection().await)
+}
+
+/// Runs a closure on the shared monitor off the async runtime (Win32 calls block).
+async fn with_monitor<T: Send + 'static>(state: &AppState, f: impl FnOnce(&mut otx_monitor::Monitor) -> T + Send + 'static) -> Result<T, String> {
+    let m = state.monitor.clone();
+    tokio::task::spawn_blocking(move || {
+        let mut g = m.lock().unwrap_or_else(|p| p.into_inner());
+        let mon = g.get_or_insert_with(otx_monitor::Monitor::new);
+        f(mon)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn monitor_system(state: tauri::State<'_, AppState>) -> Result<SystemMetrics, String> {
+    with_monitor(&state, |m| m.system()).await
+}
+
+#[tauri::command]
+async fn monitor_processes(state: tauri::State<'_, AppState>) -> Result<Vec<ProcessGroup>, String> {
+    with_monitor(&state, |m| m.processes()).await
+}
+
+/// File facts for the "What is this process?" panel. Reads the exe file only.
+#[tauri::command]
+async fn process_details(path: Option<String>) -> Result<ProcessDetails, String> {
+    let Some(path) = path.filter(|p| p.len() < 1024 && p.to_ascii_lowercase().ends_with(".exe") && std::path::Path::new(p).is_file()) else {
+        return Ok(ProcessDetails { path: None, signer: None, signature: SignatureState::Unknown, startup: false, efficiency_mode: None });
+    };
+    tokio::task::spawn_blocking(move || {
+        let (signature, signer) = otx_monitor::details::signature(&path);
+        let startup = otx_monitor::details::registered_at_startup(&path);
+        ProcessDetails { path: Some(path), signer, signature, startup, efficiency_mode: None }
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+fn action(r: Result<Response, core_client::ClientError>) -> Result<ActionResult, String> {
+    match r {
+        Ok(Response::Action(a)) => Ok(a),
+        Ok(_) => Err("unexpected reply from the Core".into()),
+        Err(e) => Err(e.message),
+    }
+}
+
+#[tauri::command]
+async fn core_set_priority(state: tauri::State<'_, AppState>, target: ProcessRef, level: PriorityLevel, dry_run: bool) -> Result<ActionResult, String> {
+    action(state.core.call(Request::SetProcessPriority { target, level, dry_run }).await)
+}
+
+#[tauri::command]
+async fn core_set_efficiency(state: tauri::State<'_, AppState>, target: ProcessRef, on: bool, dry_run: bool) -> Result<ActionResult, String> {
+    action(state.core.call(Request::SetEfficiencyMode { target, on, dry_run }).await)
+}
+
+#[tauri::command]
+async fn core_end_process(state: tauri::State<'_, AppState>, target: ProcessRef, dry_run: bool) -> Result<ActionResult, String> {
+    action(state.core.call(Request::EndProcess { target, dry_run }).await)
+}
+
+#[tauri::command]
+async fn core_list_changes(state: tauri::State<'_, AppState>) -> Result<Vec<ChangeEntry>, String> {
+    match state.core.call(Request::ListChanges).await {
+        Ok(Response::Changes(c)) => Ok(c),
+        Ok(_) => Err("unexpected reply from the Core".into()),
+        Err(e) => Err(e.message),
+    }
+}
+
+#[tauri::command]
+async fn core_revert(state: tauri::State<'_, AppState>, id: Option<String>) -> Result<ActionResult, String> {
+    let req = match id {
+        Some(id) => Request::RevertChange { id },
+        None => Request::RevertAll,
+    };
+    action(state.core.call(req).await)
 }
 
 #[tauri::command]
@@ -139,7 +222,19 @@ pub fn run() {
                 .build(),
         )
         .manage(AppState { close_to_tray: AtomicBool::new(true), ..Default::default() })
-        .invoke_handler(tauri::generate_handler![get_system_info, core_connection, set_close_to_tray, set_shortcuts])
+        .invoke_handler(tauri::generate_handler![get_system_info,
+            core_connection,
+            set_close_to_tray,
+            set_shortcuts,
+            monitor_system,
+            monitor_processes,
+            process_details,
+            core_set_priority,
+            core_set_efficiency,
+            core_end_process,
+            core_list_changes,
+            core_revert
+        ])
         .setup(|app| {
             build_tray(app)?;
             // Started by autostart with --minimized: stay in the tray.
