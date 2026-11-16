@@ -12,6 +12,9 @@ import { MOCK_NOT_RECOMMENDED } from "./mockData";
 import type { BoostStep, BoostSummary, Game, GameProfile } from "./types";
 import { startSession, stepsFrom, tintFor } from "./gameMode";
 import { useProfiles } from "../store/profiles";
+import type { Connection, ShaperRule, TrafficApp } from "./types";
+import { purposeOf } from "./netPurpose";
+import { enforced, useShaper } from "../store/shaper";
 
 interface DetectedGame {
   id: string;
@@ -244,6 +247,58 @@ export class TauriBackend extends MockBackend {
     const current = await invoke<string[]>("dns_current").catch(() => [] as string[]);
     const servers = await this.getDnsServers();
     return servers.find((s) => !s.isp && s.v4.length > 0 && s.v4.every((ip) => current.includes(ip)))?.id ?? null;
+  }
+
+  /* ---------------- Network (Phase 6) ---------------- */
+
+  private liveTrafficHistory = new Map<string, number[]>();
+
+  override async getTraffic(): Promise<TrafficApp[]> {
+    const rows = await invoke<{ id: string; exe: string; downKbps: number; upKbps: number; topRemote: string | null }[]>("net_traffic");
+    const game = useLive.getState().runningGame?.exe ?? null;
+    return rows.map((r) => {
+      const h = this.liveTrafficHistory.get(r.id) ?? [];
+      h.push(r.downKbps + r.upKbps);
+      while (h.length > 60) h.shift();
+      this.liveTrafficHistory.set(r.id, h);
+      return { id: r.id, name: r.exe, downKbps: r.downKbps, upKbps: r.upKbps, purpose: purposeOf(r.exe, game), history: [...h] };
+    });
+  }
+
+  override async getConnections(): Promise<Connection[]> {
+    const rows = await invoke<{ app: string; pid: number; protocol: "TCP" | "UDP"; local: string; remote: string; state: string }[]>("net_connections");
+    // Country/network names need the offline DB-IP database, which is not bundled yet.
+    return rows.map((r, i) => ({ id: `c${i}`, app: r.app, protocol: r.protocol, local: r.local, remote: r.remote, state: r.state, rdns: "", country: "-", asn: "-" }));
+  }
+
+  override async getRules(): Promise<ShaperRule[]> {
+    return [...useShaper.getState().rules];
+  }
+
+  override async saveRule(rule: ShaperRule): Promise<void> {
+    const rules = useShaper.getState().rules;
+    useShaper.getState().setRules(rules.some((r) => r.id === rule.id) ? rules.map((r) => (r.id === rule.id ? rule : r)) : [...rules, rule]);
+    if (useShaper.getState().focus) await this.setFocusMode(true);
+  }
+
+  override async deleteRule(id: string): Promise<void> {
+    useShaper.getState().setRules(useShaper.getState().rules.filter((r) => r.id !== id || r.essential));
+    if (useShaper.getState().focus) await this.setFocusMode(true);
+  }
+
+  override async setFocusMode(on: boolean): Promise<void> {
+    if (on) {
+      const r = await invoke<ActionResult>("shaper_apply", { rules: enforced(useShaper.getState().rules), dryRun: useSettings.getState().dryRun });
+      useShaper.getState().setFocus(!r.dryRun);
+    } else {
+      await invoke<ActionResult>("net_restore");
+      useShaper.getState().setFocus(false);
+    }
+  }
+
+  override async restoreInternet(): Promise<void> {
+    await invoke<ActionResult>("net_restore");
+    useShaper.getState().setFocus(false);
   }
 
   /* ---------------- Library and Game Mode (Phase 5) ---------------- */

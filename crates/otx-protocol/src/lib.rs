@@ -95,6 +95,44 @@ pub enum Request {
     #[serde(rename_all = "camelCase")]
     StartSession { game: Option<ProcessRef>, profile: SessionProfile, dry_run: bool },
     EndSession,
+    /// Cumulative per-process traffic counters (Kernel-Network ETW events).
+    GetTraffic,
+    /// Replace the active Traffic Shaper rules (empty = none).
+    #[serde(rename_all = "camelCase")]
+    ApplyShaper { rules: Vec<ShaperRuleSpec>, dry_run: bool },
+    /// Remove every firewall rule and QoS policy OTX.GNG added.
+    RestoreInternet,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ShaperAction {
+    Block,
+    Limit,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ShaperRuleSpec {
+    /// Plain exe name, e.g. "OneDrive.exe".
+    pub exe: String,
+    pub action: ShaperAction,
+    pub up_kbps: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PidTraffic {
+    pub pid: u32,
+    #[ts(type = "number")]
+    pub sent_bytes: u64,
+    #[ts(type = "number")]
+    pub recv_bytes: u64,
+    /// The remote ip:port this process exchanged the most bytes with (e.g. a game server).
+    pub top_remote: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
@@ -257,6 +295,7 @@ pub enum Response {
     Tweaks(Vec<TweakStatus>),
     RamClean(RamCleanReport),
     Session(SessionReport),
+    Traffic(Vec<PidTraffic>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]

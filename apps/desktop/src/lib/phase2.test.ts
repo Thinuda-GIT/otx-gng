@@ -109,3 +109,19 @@ describe("Game Mode mapping", async () => {
     expect(sameGame(null, null)).toBe(true);
   });
 });
+
+describe("Traffic Shaper and purpose labels", async () => {
+  const { enforced, DEFAULT_RULES } = await import("../store/shaper");
+  const { purposeOf } = await import("../backend/netPurpose");
+  it("never sends allow or essential rules to the Core", () => {
+    const e = enforced(DEFAULT_RULES);
+    expect(e.map((r) => r.exe)).toEqual(["OneDrive.exe", "steam.exe"]);
+    expect(e[1]).toEqual({ exe: "steam.exe", action: "limit", upKbps: 500 });
+  });
+  it("labels traffic by app", () => {
+    expect(purposeOf("OneDrive.exe", null)).toBe("cloud-sync");
+    expect(purposeOf("mygame.exe", "MyGame.exe")).toBe("game");
+    expect(purposeOf("VALORANT-Win64-Shipping.exe", null)).toBe("game");
+    expect(purposeOf("random.exe", null)).toBe("unknown");
+  });
+});

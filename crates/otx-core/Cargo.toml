@@ -26,6 +26,8 @@ tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
 windows-service = "0.8.1"
 otx-monitor = { version = "0.2.0", path = "../otx-monitor" }
 otx-tweaks = { version = "0.2.0", path = "../otx-tweaks" }
+ferrisetw = "1.2.0"
+winreg = "0.56.0"
 
 [dependencies.windows]
 version = "0.61.3"
@@ -34,6 +36,11 @@ features = [
   "Win32_Security",
   "Win32_Security_Authorization",
   "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_WindowsFirewall",
+  "Win32_System_Com",
+  "Win32_System_GroupPolicy",
+  "Win32_System_Ole",
+  "Win32_System_Variant",
   "Win32_NetworkManagement_Ndis",
   "Win32_Networking_WinSock",
   "Win32_System_Memory",

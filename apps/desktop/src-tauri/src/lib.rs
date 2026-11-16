@@ -7,6 +7,7 @@
 mod boost;
 mod core_client;
 mod games;
+mod net;
 
 use core_client::CoreClient;
 use otx_protocol::{
@@ -26,6 +27,7 @@ pub const BRAND_LINE: &str = "OTX.GNG — Built and performed by Thinuda";
 pub struct AppState {
     pub core: CoreClient,
     pub library: games::Library,
+    pub traffic: net::TrafficState,
     /// Unprivileged live monitor (no handles to other processes are opened).
     monitor: std::sync::Arc<Mutex<Option<otx_monitor::Monitor>>>,
     close_to_tray: AtomicBool,
@@ -250,7 +252,11 @@ pub fn run() {
             games::games_running,
             games::game_settings,
             games::session_start,
-            games::session_end
+            games::session_end,
+            net::net_traffic,
+            net::net_connections,
+            net::shaper_apply,
+            net::net_restore
         ])
         .setup(|app| {
             build_tray(app)?;

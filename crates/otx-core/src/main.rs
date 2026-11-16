@@ -21,6 +21,8 @@ mod ram;
 mod security;
 mod server;
 mod session;
+mod shaper;
+mod traffic;
 mod state;
 
 use journal::{Journal, SystemReverter};

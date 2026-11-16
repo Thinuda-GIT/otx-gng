@@ -298,6 +298,10 @@ impl Monitor {
 }
 
 /// (NT device path, "C:") for every drive letter.
+pub fn dos_device_map() -> Vec<(String, String)> {
+    dos_devices()
+}
+
 fn dos_devices() -> Vec<(String, String)> {
     let mut out = Vec::new();
     for letter in b'A'..=b'Z' {

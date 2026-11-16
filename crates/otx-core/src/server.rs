@@ -181,6 +181,15 @@ pub fn dispatch(state: &Arc<CoreState>, f: RequestFrame) -> ResponseFrame {
         Request::SetDns { servers, dry_run } => result(f.id, crate::boost::set_dns(state, &servers, dry_run)),
         Request::StartSession { game, profile, dry_run } => result(f.id, crate::session::start(state, game, &profile, dry_run)),
         Request::EndSession => ResponseFrame::ok(f.id, crate::session::handle_end(state)),
+        Request::GetTraffic => match crate::traffic::snapshot() {
+            Ok(t) => ResponseFrame::ok(f.id, Response::Traffic(t)),
+            Err(e) => ResponseFrame::err(f.id, ErrorCode::Unsupported, e),
+        },
+        Request::ApplyShaper { rules, dry_run } => result(f.id, crate::shaper::apply(state, &rules, dry_run)),
+        Request::RestoreInternet => {
+            let n = crate::shaper::restore(state);
+            ResponseFrame::ok(f.id, Response::Action(otx_protocol::ActionResult { dry_run: false, changes: vec![format!("{n} rules removed")], change_id: None }))
+        }
     }
 }
 

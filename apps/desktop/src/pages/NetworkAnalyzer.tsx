@@ -53,11 +53,19 @@ export function NetworkAnalyzer() {
 
 function LiveTraffic() {
   const [apps, setApps] = useState<TrafficApp[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const paused = useLive((s) => s.paused);
   const latest = useLive((s) => s.latest);
   useEffect(() => {
     if (paused) return;
-    const load = () => void backend.getTraffic().then(setApps);
+    const load = () =>
+      void backend
+        .getTraffic()
+        .then((a) => {
+          setApps(a);
+          setError(null);
+        })
+        .catch((e: unknown) => setError(String(e)));
     load();
     const h = setInterval(load, 1000);
     return () => clearInterval(h);
@@ -72,6 +80,7 @@ function LiveTraffic() {
         <Stat label="Adapter" value="Wi-Fi" sub="866 Mbps link, 5 GHz" />
         <Stat label="Apps using the network" value={apps.length} />
       </Glass>
+      {error && <p className="text-warn">{error}</p>}
       <Panel title="Top talkers" help="Measured per process from Windows network events (ETW). The 'what is it for' label is a heuristic from the process, its publisher and where it connects.">
         <ul className="space-y-3">
           {sorted.map((a) => {

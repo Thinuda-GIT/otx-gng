@@ -2,10 +2,11 @@
 import type { ActionResult } from "./ActionResult";
 import type { ChangeEntry } from "./ChangeEntry";
 import type { CoreStatus } from "./CoreStatus";
+import type { PidTraffic } from "./PidTraffic";
 import type { RamCleanReport } from "./RamCleanReport";
 import type { SessionReport } from "./SessionReport";
 import type { SystemInfo } from "./SystemInfo";
 import type { TweakStatus } from "./TweakStatus";
 import type { Welcome } from "./Welcome";
 
-export type Response = { "kind": "welcome", "data": Welcome } | { "kind": "pong" } | { "kind": "status", "data": CoreStatus } | { "kind": "systemInfo", "data": SystemInfo } | { "kind": "action", "data": ActionResult } | { "kind": "changes", "data": Array<ChangeEntry> } | { "kind": "tweaks", "data": Array<TweakStatus> } | { "kind": "ramClean", "data": RamCleanReport } | { "kind": "session", "data": SessionReport };
+export type Response = { "kind": "welcome", "data": Welcome } | { "kind": "pong" } | { "kind": "status", "data": CoreStatus } | { "kind": "systemInfo", "data": SystemInfo } | { "kind": "action", "data": ActionResult } | { "kind": "changes", "data": Array<ChangeEntry> } | { "kind": "tweaks", "data": Array<TweakStatus> } | { "kind": "ramClean", "data": RamCleanReport } | { "kind": "session", "data": SessionReport } | { "kind": "traffic", "data": Array<PidTraffic> };

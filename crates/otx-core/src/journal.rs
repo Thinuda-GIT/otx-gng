@@ -31,6 +31,10 @@ pub enum RevertOp {
     Tweak { id: String, prev: Vec<otx_tweaks::Prev> },
     /// Restore the adapter's previous DNS servers ("" = automatic).
     Dns { adapter: String, v4: String, v6: String },
+    /// Remove a Windows Firewall rule OTX.GNG added.
+    FirewallRule { name: String },
+    /// Remove a QoS throttle policy OTX.GNG added.
+    QosPolicy { exe: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -70,6 +74,8 @@ impl Reverter for SystemReverter {
             RevertOp::ProcessEfficiency { target, control, state } => crate::process::revert_efficiency(*target, *control, *state),
             RevertOp::MemoryPriority { targets } => crate::ram::restore_memory_priority(targets),
             RevertOp::Tweak { prev, .. } => otx_tweaks::revert(&otx_tweaks::win::WinSys { scope: otx_tweaks::Scope::Machine }, prev),
+            RevertOp::FirewallRule { name } => crate::shaper::remove_rule(name),
+            RevertOp::QosPolicy { exe } => crate::shaper::remove_qos(exe),
             RevertOp::Dns { adapter, v4, v6 } => {
                 crate::dns::set(adapter, false, v4)?;
                 let _ = crate::dns::set(adapter, true, v6);

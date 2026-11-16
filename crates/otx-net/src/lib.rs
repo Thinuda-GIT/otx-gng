@@ -1,5 +1,6 @@
 //! Unprivileged network tools (run inside the app; nothing here needs elevation).
 
+pub mod conn;
 pub mod dns;
 
 use std::net::IpAddr;
