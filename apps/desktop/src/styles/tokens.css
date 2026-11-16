@@ -1,0 +1,68 @@
+/* OTX Liquid Glass: design tokens. The single source for color, type, radius and glass values. */
+:root {
+  /* Canvas */
+  --bg-0: #05060a;
+  --bg-1: #0b0d14;
+
+  /* Accents (hex for text/borders, rgb triplets for alpha mixing) */
+  --accent-green: #1ef2a0;  --rgb-green: 30 242 160;
+  --accent-red: #ff3d5a;    --rgb-red: 255 61 90;
+  --accent-cyan: #2de2ff;   --rgb-cyan: 45 226 255;
+  --accent-violet: #8b6cff; --rgb-violet: 139 108 255;
+  --accent-amber: #ffb020;  --rgb-amber: 255 176 32;
+
+  /* User-selectable UI accent (Settings > Appearance). Default green. */
+  --accent: var(--accent-green);
+  --rgb-accent: var(--rgb-green);
+
+  /* Text. --text-3 (40%) is for disabled/decorative text only: it is under 4.5:1 on glass. */
+  --text-1: rgb(255 255 255 / 0.92);
+  --text-2: rgb(255 255 255 / 0.64);
+  --text-3: rgb(255 255 255 / 0.4);
+
+  /* Concentric radii and spacing (8px grid) */
+  --r-window: 28px;
+  --r-panel: 22px;
+  --r-control: 14px;
+  --r-pill: 999px;
+  --space: 8px;
+
+  /* Type (SIL OFL fonts, bundled locally via @fontsource) */
+  --font-head: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+
+  /* Glass material (overridden per quality tier below) */
+  --glass-blur: 28px;
+  --glass-sat: 175%;
+  --glass-fill-top: rgb(255 255 255 / 0.08);
+  --glass-fill-bottom: rgb(255 255 255 / 0.045);
+  --glass-edge-hi: rgb(255 255 255 / 0.55);
+  --glass-edge-lo: rgb(255 255 255 / 0.06);
+  --glass-opaque: #141823;
+
+  /* Page tint for shadows / backdrop (rgb triplet). Game pages override it. */
+  --page-tint: var(--rgb-accent);
+
+  /* Data-reactive backdrop: 0 = idle (cool/green), 1 = heavy load (warm/red). Set from JS. */
+  --load: 0;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+html[data-accent="cyan"]   { --accent: var(--accent-cyan);   --rgb-accent: var(--rgb-cyan); }
+html[data-accent="violet"] { --accent: var(--accent-violet); --rgb-accent: var(--rgb-violet); }
+html[data-accent="red"]    { --accent: var(--accent-red);    --rgb-accent: var(--rgb-red); }
+html[data-accent="amber"]  { --accent: var(--accent-amber);  --rgb-accent: var(--rgb-amber); }
+
+/* Quality tiers: chosen by src/lib/glassQuality.ts */
+html[data-glass="lite"] {
+  --glass-blur: 12px;
+  --glass-sat: 140%;
+}
+html[data-glass="off"],
+html[data-transparency="reduced"] {
+  --glass-fill-top: #171b27;
+  --glass-fill-bottom: #121520;
+}

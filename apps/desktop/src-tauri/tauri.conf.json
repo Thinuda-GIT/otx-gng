@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OTX.GNG",
+  "version": "0.1.0",
+  "identifier": "io.github.otxgng.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "OTX.GNG",
+        "width": 1440,
+        "height": 810,
+        "minWidth": 1100,
+        "minHeight": 680,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Thinuda",
+    "copyright": "OTX.GNG — Built and performed by Thinuda. GPL-3.0-or-later.",
+    "shortDescription": "Free game booster for Windows",
+    "longDescription": "OTX.GNG — Built and performed by Thinuda. Free, honest, measurable game boosting for Windows 10 and 11.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": {
+        "installMode": "perMachine",
+        "displayLanguageSelector": false
+      }
+    }
+  }
+}

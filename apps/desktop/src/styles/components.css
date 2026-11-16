@@ -1,0 +1,92 @@
+/* Native form controls styled as glass */
+.otx-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(var(--rgb-accent) / 0.9) var(--pct), rgb(255 255 255 / 0.12) var(--pct));
+  cursor: pointer;
+}
+.otx-range:disabled { opacity: 0.45; cursor: not-allowed; }
+.otx-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #fff, #dfe5f5);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.4), 0 0 0 4px rgb(var(--rgb-accent) / 0.18);
+  transition: transform 0.15s var(--ease-out);
+}
+.otx-range:active::-webkit-slider-thumb { transform: scale(1.15, 0.92); }
+
+.otx-select option {
+  background: #141823;
+  color: #fff;
+}
+
+.otx-input {
+  height: 40px;
+  width: 100%;
+  border-radius: var(--r-control);
+  padding: 0 14px;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12), inset 0 1px 2px rgb(0 0 0 / 0.3);
+  color: var(--text-1);
+  transition: box-shadow 0.15s;
+}
+.otx-input::placeholder { color: var(--text-3); }
+.otx-input:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgb(var(--rgb-accent) / 0.7), 0 0 0 3px rgb(var(--rgb-accent) / 0.2);
+}
+.otx-input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px rgb(var(--rgb-red) / 0.8); }
+
+.otx-check {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2);
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.otx-check:checked { background: var(--accent-green); box-shadow: 0 0 10px -2px rgb(var(--rgb-green) / 0.7); }
+.otx-check:checked::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid #05060a;
+  border-bottom: 2px solid #05060a;
+  transform: translateY(-1px) rotate(-45deg);
+}
+.otx-check:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Section heading inside pages */
+.otx-section-title {
+  font-family: var(--font-head);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-1);
+}
+
+/* Progress bar */
+.otx-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+  overflow: hidden;
+}
+.otx-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+  box-shadow: 0 0 12px rgb(var(--rgb-green) / 0.6);
+  transition: width 0.25s var(--ease-out);
+}

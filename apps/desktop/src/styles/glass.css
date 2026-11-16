@@ -1,0 +1,95 @@
+/* One reusable glass material. Layers (bottom to top):
+   a. backdrop blur/saturate/brightness   b. gradient fill
+   c. masked 1px edge light (::before)      d. inner highlight + bottom inner shadow
+   e. pointer-following specular sheen + f. micro-noise (::after)
+   g. accent-tinted outer shadow */
+
+.glass {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--radius, var(--r-panel));
+  background: linear-gradient(180deg, var(--glass-fill-top), var(--glass-fill-bottom));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(1.05);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)) brightness(1.05);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    inset 0 -1px 0 rgb(0 0 0 / 0.28),
+    0 2px 6px rgb(0 0 0 / 0.22),
+    0 22px 48px -22px rgb(var(--shadow-tint, var(--page-tint)) / 0.38);
+  color: var(--text-1);
+}
+
+/* c. edge light: gradient border cut out with a mask */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    var(--glass-edge-hi) 0%,
+    rgb(255 255 255 / 0.14) 22%,
+    var(--glass-edge-lo) 50%,
+    rgb(255 255 255 / 0.05) 72%,
+    rgb(255 255 255 / 0.32) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+/* e + f. specular sheen (position from --mx/--my, set in rAF by useSpecular) and noise */
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(260px circle at var(--mx, 30%) var(--my, -60%), rgb(255 255 255 / var(--sheen, 0.1)), transparent 62%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .028 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: auto, 160px 160px;
+}
+
+/* Variants */
+.glass--clear {
+  --glass-fill-top: rgb(255 255 255 / 0.04);
+  --glass-fill-bottom: rgb(255 255 255 / 0.015);
+}
+.glass--tinted {
+  --shadow-tint: var(--tint, var(--rgb-accent));
+  background: linear-gradient(180deg, rgb(var(--tint, var(--rgb-accent)) / 0.4), rgb(var(--tint, var(--rgb-accent)) / 0.2));
+  --glass-edge-hi: rgb(var(--tint, var(--rgb-accent)) / 0.9);
+}
+.glass--thick {
+  --glass-fill-top: rgb(22 26 38 / 0.82);
+  --glass-fill-bottom: rgb(14 17 26 / 0.86);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 12px)) saturate(var(--glass-sat));
+  backdrop-filter: blur(calc(var(--glass-blur) + 12px)) saturate(var(--glass-sat));
+}
+
+/* Hero lens refraction: only in Full tier and only where the browser supports SVG backdrop filters. */
+html[data-glass="full"][data-lens="on"] .glass--lens {
+  -webkit-backdrop-filter: url(#otx-lens) blur(6px) saturate(180%) brightness(1.08);
+  backdrop-filter: url(#otx-lens) blur(6px) saturate(180%) brightness(1.08);
+}
+
+/* Lite: cheaper blur, no sheen */
+html[data-glass="lite"] .glass::after { background-image: none; }
+
+/* Off / reduced transparency: no backdrop sampling at all (near-zero GPU) */
+html[data-glass="off"] .glass,
+html[data-transparency="reduced"] .glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-glass="off"] .glass::after,
+html[data-transparency="reduced"] .glass::after { display: none; }
+html[data-glass="off"] .glass--tinted,
+html[data-transparency="reduced"] .glass--tinted {
+  background: linear-gradient(180deg, rgb(var(--tint, var(--rgb-accent)) / 0.3), rgb(var(--tint, var(--rgb-accent)) / 0.18)), #151925;
+}

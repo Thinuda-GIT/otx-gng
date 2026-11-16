@@ -1,0 +1,26 @@
+[package]
+name = "otx-gng"
+version = "0.1.0"
+description = "OTX.GNG — free, honest, measurable game boosting for Windows"
+authors = ["Thinuda"]
+license = "GPL-3.0-or-later"
+edition = "2021"
+rust-version = "1.77"
+
+# Library + thin binary is the layout Tauri 2 recommends.
+[lib]
+name = "otx_gng_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
