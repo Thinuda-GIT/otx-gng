@@ -12,7 +12,7 @@ import { MOCK_NOT_RECOMMENDED } from "./mockData";
 import type { BoostStep, BoostSummary, Game, GameProfile } from "./types";
 import { startSession, stepsFrom, tintFor } from "./gameMode";
 import { useProfiles } from "../store/profiles";
-import type { Adapter, Connection, Hop, QualityResult, ShaperRule, TrafficApp, TuneFinding } from "./types";
+import type { Adapter, CommunityEntry, Connection, Hop, QualityResult, ShaperRule, TrafficApp, TuneFinding } from "./types";
 
 interface ProbeStats {
   sent: number;
@@ -440,6 +440,28 @@ export class TauriBackend extends MockBackend {
     out.push({ id: "bloat", title: "Bufferbloat", detail: "Run the Quality Test: it measures latency while downloading and uploading. A big rise means upload or download is saturating the link; capping background apps in Traffic Shaper usually fixes it.", severity: "info", evidence: "documented" });
     out.push({ id: "nagle", title: "TCP acknowledgement tweaks", detail: "Most shooters use UDP, so Nagle/ACK changes are not expected to help them.", severity: "info", evidence: "experimental" });
     return out;
+  }
+
+  /* ---------------- Community relays (Phase 9) ---------------- */
+
+  override async getCommunity(): Promise<CommunityEntry[]> {
+    return useSettings.getState().relays.map((r) => ({
+      id: r.id,
+      kind: "relay",
+      name: r.name,
+      address: r.address,
+      region: "Added by you",
+      pingMs: null,
+      favorite: false,
+      signatureOk: true,
+      source: "Your relay (token stored on this PC)",
+    }));
+  }
+
+  override async pingCommunity(id: string): Promise<number | null> {
+    const r = useSettings.getState().relays.find((x) => x.id === id);
+    if (!r) return null;
+    return invoke<number | null>("relay_ping", { address: r.address });
   }
 
   /* ---------------- Library and Game Mode (Phase 5) ---------------- */

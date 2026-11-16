@@ -5,6 +5,7 @@ import type { CommunityEntry } from "../backend/types";
 import { PageHeader, Panel, Row } from "../components/ui";
 import { GlassBadge, GlassButton, TierBadge } from "../design-system";
 import { useUi } from "../store/ui";
+import { useSettings } from "../store/settings";
 
 /** host:port, where host is a DNS name or IPv4 address and port is 1-65535. */
 export function isValidRelayAddress(s: string): boolean {
@@ -82,7 +83,7 @@ export function CommunityServers() {
               </li>
             ))}
           </ul>
-          <p className="mt-4 text-[13px] text-t2">Phase 1 shows example entries. The real lists are published and signed in Phase 9.</p>
+          <p className="mt-4 text-[13px] text-t2">No signed community list has been published yet, so only relays you add yourself appear here. Lists, when published, are verified before use and rejected if the signature fails.</p>
         </Panel>
 
         <div className="space-y-5">
@@ -98,7 +99,10 @@ export function CommunityServers() {
                 kind="primary"
                 disabled={!addrOk || !tokenOk}
                 onClick={() => {
-                  toast({ tone: "info", title: "Relay saved for later", body: "Relay connections arrive in Phase 9. The token is stored only on this PC." });
+                  const relays = useSettings.getState().relays;
+                  useSettings.getState().set("relays", [...relays, { id: `relay-${Date.now()}`, name: addr.split(":")[0]!, address: addr.trim(), token: token.trim() }]);
+                  toast({ tone: "ok", title: "Relay added", body: "Stored only on this PC. Use Test to measure its latency." });
+                  void backend.getCommunity().then(setItems);
                   setAddr("");
                   setToken("");
                 }}

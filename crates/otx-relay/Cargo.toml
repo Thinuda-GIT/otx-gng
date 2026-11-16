@@ -1,0 +1,20 @@
+[package]
+name = "otx-relay"
+description = "OTX Relay: an authenticated, allow-listed, rate-limited UDP relay for game traffic (Tier 2). Never an open proxy; never logs payloads."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "otx-relay"
+path = "src/main.rs"
+
+[dependencies]
+hmac = "0.12"
+sha2 = "0.10"
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal"] }

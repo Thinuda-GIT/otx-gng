@@ -265,7 +265,8 @@ pub fn run() {
             quality::net_mtu,
             quality::net_adapters,
             quality::net_vpn,
-            quality::net_prefer
+            quality::net_prefer,
+            quality::relay_ping
         ])
         .setup(|app| {
             build_tray(app)?;

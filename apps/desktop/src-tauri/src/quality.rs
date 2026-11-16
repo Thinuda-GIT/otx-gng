@@ -103,3 +103,27 @@ pub async fn net_prefer(state: tauri::State<'_, AppState>, luid: Option<String>,
         Err(e) => Err(e.message),
     }
 }
+
+/// Latency to an OTX Relay (its unauthenticated, rate-limited ping): median of 3, or None.
+#[tauri::command]
+pub async fn relay_ping(address: String) -> Result<Option<f64>, String> {
+    let addr: SocketAddr = tokio::net::lookup_host(address.trim())
+        .await
+        .map_err(|e| format!("cannot resolve {address}: {e}"))?
+        .find(|a| a.is_ipv4())
+        .ok_or("no IPv4 address for that relay")?;
+    let sock = tokio::net::UdpSocket::bind("0.0.0.0:0").await.map_err(|e| e.to_string())?;
+    let mut samples = Vec::new();
+    for i in 0..3u8 {
+        let nonce = [b'O', b'T', b'X', b'P', i, 1, 2, 3, 4, 5, 6, 7];
+        let t = std::time::Instant::now();
+        sock.send_to(&nonce, addr).await.map_err(|e| e.to_string())?;
+        let mut buf = [0u8; 64];
+        let got = tokio::time::timeout(Duration::from_millis(1500), sock.recv_from(&mut buf)).await;
+        samples.push(match got {
+            Ok(Ok((12, from))) if from == addr && buf[..12] == nonce => Some(t.elapsed().as_secs_f64() * 1000.0),
+            _ => None,
+        });
+    }
+    Ok(probe::stats(&samples).median_ms)
+}
