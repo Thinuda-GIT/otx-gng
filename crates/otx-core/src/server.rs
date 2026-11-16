@@ -187,6 +187,19 @@ pub fn dispatch(state: &Arc<CoreState>, f: RequestFrame) -> ResponseFrame {
         },
         Request::ApplyShaper { rules, dry_run } => result(f.id, crate::shaper::apply(state, &rules, dry_run)),
         Request::PreferAdapter { luid, dry_run } => result(f.id, crate::netif::prefer(state, &luid, dry_run)),
+        Request::StartCapture { target } => {
+            // Only the process's Present calls are counted; the game is never opened.
+            let alive = otx_monitor::nt::processes().map(|ps| ps.iter().any(|p| p.pid == target.pid && p.create_time == target.create_time)).unwrap_or(false);
+            if !alive {
+                ResponseFrame::err(f.id, ErrorCode::Validation, "The game is no longer running.")
+            } else {
+                match crate::capture::start(target.pid) {
+                    Ok(()) => ResponseFrame::ok(f.id, Response::Pong),
+                    Err(e) => ResponseFrame::err(f.id, ErrorCode::Unsupported, e),
+                }
+            }
+        }
+        Request::StopCapture => ResponseFrame::ok(f.id, Response::Capture(crate::capture::stop())),
         Request::ClearAdapterPreference => {
             let n = crate::netif::unprefer(state);
             ResponseFrame::ok(f.id, Response::Action(otx_protocol::ActionResult { dry_run: false, changes: vec![format!("{n} connections back to automatic")], change_id: None }))

@@ -9,4 +9,4 @@ import type { SystemInfo } from "./SystemInfo";
 import type { TweakStatus } from "./TweakStatus";
 import type { Welcome } from "./Welcome";
 
-export type Response = { "kind": "welcome", "data": Welcome } | { "kind": "pong" } | { "kind": "status", "data": CoreStatus } | { "kind": "systemInfo", "data": SystemInfo } | { "kind": "action", "data": ActionResult } | { "kind": "changes", "data": Array<ChangeEntry> } | { "kind": "tweaks", "data": Array<TweakStatus> } | { "kind": "ramClean", "data": RamCleanReport } | { "kind": "session", "data": SessionReport } | { "kind": "traffic", "data": Array<PidTraffic> };
+export type Response = { "kind": "welcome", "data": Welcome } | { "kind": "pong" } | { "kind": "status", "data": CoreStatus } | { "kind": "systemInfo", "data": SystemInfo } | { "kind": "action", "data": ActionResult } | { "kind": "changes", "data": Array<ChangeEntry> } | { "kind": "tweaks", "data": Array<TweakStatus> } | { "kind": "ramClean", "data": RamCleanReport } | { "kind": "session", "data": SessionReport } | { "kind": "traffic", "data": Array<PidTraffic> } | { "kind": "capture", "data": Array<number> };

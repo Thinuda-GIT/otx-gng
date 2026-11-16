@@ -254,6 +254,8 @@ pub fn run() {
             games::game_settings,
             games::session_start,
             games::session_end,
+            games::capture_start,
+            games::capture_stop,
             net::net_traffic,
             net::net_connections,
             net::shaper_apply,

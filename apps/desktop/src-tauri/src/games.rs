@@ -139,3 +139,21 @@ pub async fn session_end(state: tauri::State<'_, AppState>) -> Result<SessionRep
         Err(e) => Err(e.message),
     }
 }
+
+#[tauri::command]
+pub async fn capture_start(state: tauri::State<'_, AppState>, target: ProcessRef) -> Result<(), String> {
+    match state.core.call(Request::StartCapture { target }).await {
+        Ok(_) => Ok(()),
+        Err(e) if e.link != otx_protocol::CoreLink::Connected => Err("Frame capture needs the OTX.GNG Core service.".into()),
+        Err(e) => Err(e.message),
+    }
+}
+
+#[tauri::command]
+pub async fn capture_stop(state: tauri::State<'_, AppState>) -> Result<Vec<f32>, String> {
+    match state.core.call(Request::StopCapture).await {
+        Ok(Response::Capture(ft)) => Ok(ft),
+        Ok(_) => Err("unexpected reply from the Core".into()),
+        Err(e) => Err(e.message),
+    }
+}

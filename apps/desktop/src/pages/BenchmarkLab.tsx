@@ -6,6 +6,12 @@ import { PageHeader, Panel, Row } from "../components/ui";
 import { GlassBadge, GlassButton, GlassSelect, GlassSlider } from "../design-system";
 import { compare, summarizeFrametimes, type Comparison, type RunSummary } from "../lib/benchStats";
 import { downloadText } from "../lib/dom";
+import { invoke } from "@tauri-apps/api/core";
+import { endSession, startSession } from "../backend/gameMode";
+import { isTauri } from "../lib/tauri";
+import { useLive } from "../store/live";
+import { useProfiles } from "../store/profiles";
+import { useUi } from "../store/ui";
 
 /** Preview-only frame-time generator. Real captures use ETW Present events (PresentMon approach). */
 function fakeCapture(baseFps: number, stutter: number, seconds: number): number[] {
@@ -31,8 +37,53 @@ export function BenchmarkLab() {
   const [boosted, setBoosted] = useState<RunSummary[]>([]);
 
   useEffect(() => void backend.getGames().then(setGames), []);
+  const runningGame = useLive((s) => s.runningGame);
+  const real = isTauri();
+
+  /** Real A/B: alternate baseline (no session) and boosted (Game Mode on) captures of the running game. */
+  const runReal = async () => {
+    if (!runningGame) {
+      useUi.getState().toast({ tone: "warn", title: "Start the game first", body: "Benchmark Lab measures the game that is running now. Play the same scene for every run." });
+      return;
+    }
+    const b: RunSummary[] = [];
+    const o: RunSummary[] = [];
+    const wait = (s: number, label: string) =>
+      new Promise<void>((resolve) => {
+        let left = s;
+        setProgress(`${label}: ${left} s left`);
+        const h = setInterval(() => {
+          left -= 1;
+          setProgress(`${label}: ${left} s left`);
+          if (left <= 0) {
+            clearInterval(h);
+            resolve();
+          }
+        }, 1000);
+      });
+    try {
+      for (let i = 0; i < runs; i++) {
+        await endSession().catch(() => undefined);
+        await invoke("capture_start", { target: runningGame.process });
+        await wait(duration, `Baseline run ${i + 1} of ${runs}`);
+        b.push(summarizeFrametimes(await invoke<number[]>("capture_stop")));
+        await startSession(runningGame.process, useProfiles.getState().get(runningGame.gameId));
+        await invoke("capture_start", { target: runningGame.process });
+        await wait(duration, `Boosted run ${i + 1} of ${runs}`);
+        o.push(summarizeFrametimes(await invoke<number[]>("capture_stop")));
+      }
+      setBase(b);
+      setBoosted(o);
+    } catch (e) {
+      await invoke("capture_stop").catch(() => undefined);
+      useUi.getState().toast({ tone: "error", title: "Benchmark stopped", body: String(e) });
+    } finally {
+      setProgress(null);
+    }
+  };
 
   const run = async () => {
+    if (real) return runReal();
     const b: RunSummary[] = [];
     const o: RunSummary[] = [];
     for (let i = 0; i < runs; i++) {
@@ -56,7 +107,7 @@ export function BenchmarkLab() {
     const report = {
       app: "OTX.GNG",
       kind: "benchmark-report",
-      previewData: true,
+      previewData: !real,
       game: g?.name,
       durationSecPerRun: duration,
       runsPerSide: runs,
@@ -73,8 +124,12 @@ export function BenchmarkLab() {
       <PageHeader title="Benchmark Lab" subtitle="Honest A/B tests: baseline against boosted, several runs each, with the spread shown. 'Within noise' is a valid answer." tier={0} />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1.4fr]">
         <Panel title="Setup">
-          <Row label="Game">
-            <GlassSelect label="Game" value={game} onChange={setGame} options={games.map((x) => ({ value: x.id, label: x.name }))} />
+          <Row label="Game" hint={real ? "The game that is running now is measured." : undefined}>
+            {real ? (
+              <GlassBadge tone={runningGame ? "ok" : "neutral"}>{runningGame ? runningGame.exe : "No game running"}</GlassBadge>
+            ) : (
+              <GlassSelect label="Game" value={game} onChange={setGame} options={games.map((x) => ({ value: x.id, label: x.name }))} />
+            )}
           </Row>
           <Row label="Seconds per run" hint="60 to 180 s. Play the same scene each time.">
             <div className="w-56">
@@ -87,7 +142,7 @@ export function BenchmarkLab() {
             </div>
           </Row>
           <p className="my-3 text-[13px] text-t2">
-            Frame times come from Windows' own Present events (the PresentMon approach): no injection, no hooks, nothing touches the game. Preview mode uses generated frame times and shortened runs.
+            Frame times come from Windows' own DXGI Present events (the approach PresentMon uses): no injection, no hooks, nothing touches the game. They are intervals between Present calls, not display flips, and games that do not use DXGI (DirectX 9, OpenGL, Vulkan) produce none. In the desktop app this measures the running game; the browser preview uses generated data.
           </p>
           <div className="flex gap-2">
             <GlassButton kind="primary" icon={<FlaskConical size={16} />} loading={progress !== null} onClick={() => void run()}>

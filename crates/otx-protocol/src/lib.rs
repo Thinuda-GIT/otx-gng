@@ -107,6 +107,10 @@ pub enum Request {
     PreferAdapter { luid: String, dry_run: bool },
     /// Return every connection to automatic metrics.
     ClearAdapterPreference,
+    /// Begin recording Present events of this process (frame-time capture).
+    StartCapture { target: ProcessRef },
+    /// Stop recording and return the frame times.
+    StopCapture,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
@@ -301,6 +305,8 @@ pub enum Response {
     RamClean(RamCleanReport),
     Session(SessionReport),
     Traffic(Vec<PidTraffic>),
+    /// Frame times in milliseconds.
+    Capture(Vec<f32>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]

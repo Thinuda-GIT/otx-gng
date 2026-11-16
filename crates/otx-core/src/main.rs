@@ -13,6 +13,7 @@
 
 mod actions;
 mod boost;
+mod capture;
 mod dns;
 mod install;
 mod journal;
