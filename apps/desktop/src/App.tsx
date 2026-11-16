@@ -54,7 +54,8 @@ export default function App() {
   const sysReduceTransparency = mediaMatches("(prefers-reduced-transparency: reduce)");
   const reduceMotion = s.reduceMotion === "on" || (s.reduceMotion === "system" && sysReduceMotion);
   const reduceTransparency = s.reduceTransparency === "on" || (s.reduceTransparency === "system" && sysReduceTransparency);
-  const gameRunning = s.simulateGameId !== null;
+  const realGame = useLive((x) => x.runningGame !== null);
+  const gameRunning = s.simulateGameId !== null || realGame;
 
   const glass = effectiveGlass({
     setting: s.glassQuality,

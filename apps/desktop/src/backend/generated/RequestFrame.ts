@@ -2,6 +2,7 @@
 import type { PriorityLevel } from "./PriorityLevel";
 import type { ProcessRef } from "./ProcessRef";
 import type { RamMethod } from "./RamMethod";
+import type { SessionProfile } from "./SessionProfile";
 
 /**
  * A client → Core frame.
@@ -10,4 +11,4 @@ export type RequestFrame = {
 /**
  * Client-chosen id echoed in the response.
  */
-id: number, } & ({ "method": "hello", "params": { protocol: number, clientNonce: string, } } | { "method": "ping" } | { "method": "getStatus" } | { "method": "getSystemInfo" } | { "method": "setProcessPriority", "params": { target: ProcessRef, level: PriorityLevel, dryRun: boolean, } } | { "method": "setEfficiencyMode", "params": { target: ProcessRef, on: boolean, dryRun: boolean, } } | { "method": "endProcess", "params": { target: ProcessRef, dryRun: boolean, } } | { "method": "listChanges" } | { "method": "revertChange", "params": { id: string, } } | { "method": "revertAll" } | { "method": "listTweaks" } | { "method": "setTweak", "params": { id: string, on: boolean, dryRun: boolean, } } | { "method": "cleanMemory", "params": { methods: Array<RamMethod>, allow: Array<string>, skip: Array<string>, dryRun: boolean, } } | { "method": "setDns", "params": { servers: Array<string>, dryRun: boolean, } });
+id: number, } & ({ "method": "hello", "params": { protocol: number, clientNonce: string, } } | { "method": "ping" } | { "method": "getStatus" } | { "method": "getSystemInfo" } | { "method": "setProcessPriority", "params": { target: ProcessRef, level: PriorityLevel, dryRun: boolean, } } | { "method": "setEfficiencyMode", "params": { target: ProcessRef, on: boolean, dryRun: boolean, } } | { "method": "endProcess", "params": { target: ProcessRef, dryRun: boolean, } } | { "method": "listChanges" } | { "method": "revertChange", "params": { id: string, } } | { "method": "revertAll" } | { "method": "listTweaks" } | { "method": "setTweak", "params": { id: string, on: boolean, dryRun: boolean, } } | { "method": "cleanMemory", "params": { methods: Array<RamMethod>, allow: Array<string>, skip: Array<string>, dryRun: boolean, } } | { "method": "setDns", "params": { servers: Array<string>, dryRun: boolean, } } | { "method": "startSession", "params": { game: ProcessRef | null, profile: SessionProfile, dryRun: boolean, } } | { "method": "endSession" });

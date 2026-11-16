@@ -1,0 +1,17 @@
+[package]
+name = "otx-games"
+description = "Read-only game library detection for OTX.GNG (Steam, Epic, Riot, installed-program records)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+otx-monitor = { version = "0.2.0", path = "../otx-monitor" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+winreg = "0.56.0"
+
+[dev-dependencies]
+tempfile = "3"

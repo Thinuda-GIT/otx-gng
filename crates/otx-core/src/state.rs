@@ -22,6 +22,8 @@ pub struct CoreState {
     pub journal: Mutex<Journal>,
     /// System info is cached briefly: it is cheap but not free (disk IOCTLs, DXGI).
     sysinfo_cache: Mutex<Option<(Instant, SystemInfo)>>,
+    /// The running Game Mode session, if any.
+    pub session: Mutex<Option<crate::session::Active>>,
 }
 
 const SYSINFO_TTL: Duration = Duration::from_secs(30);
@@ -51,6 +53,7 @@ impl CoreState {
             recovered_changes,
             journal: Mutex::new(journal),
             sysinfo_cache: Mutex::new(None),
+            session: Mutex::new(None),
         }
     }
 

@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import type { CoreConnection, Metrics, SystemSnapshot } from "../backend/types";
 import type { EffectiveGlass, GpuTier } from "../lib/glassQuality";
+import type { RunningGame } from "../backend/gameMode";
 
 export const HISTORY = 120; // samples kept for charts
 
@@ -13,6 +14,9 @@ interface LiveStore {
   gpuTier: GpuTier;
   glass: EffectiveGlass;
   paused: boolean;
+  /** A library or known game currently running (detected by exe name). */
+  runningGame: RunningGame | null;
+  setRunningGame: (g: RunningGame | null) => void;
   setSystem: (s: SystemSnapshot) => void;
   setCore: (c: CoreConnection) => void;
   push: (m: Metrics) => void;
@@ -29,6 +33,8 @@ export const useLive = create<LiveStore>()((set) => ({
   gpuTier: "unknown",
   glass: "full",
   paused: false,
+  runningGame: null,
+  setRunningGame: (runningGame) => set({ runningGame }),
   setSystem: (system) => set({ system }),
   setCore: (core) => set({ core }),
   push: (m) => set((s) => ({ latest: m, history: [...s.history.slice(-(HISTORY - 1)), m] })),

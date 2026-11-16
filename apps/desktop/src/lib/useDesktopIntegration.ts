@@ -7,9 +7,11 @@ import { isTauri } from "./tauri";
 import { useSettings } from "../store/settings";
 import { useUi } from "../store/ui";
 import { useRamRoutine } from "./useRamRoutine";
+import { useGameWatcher } from "./useGameWatcher";
 
 export function useDesktopIntegration(): void {
   useRamRoutine();
+  useGameWatcher();
   const minimizeToTray = useSettings((s) => s.minimizeToTray);
   const restart = useSettings((s) => s.restartShortcut);
   const restore = useSettings((s) => s.restoreShortcut);

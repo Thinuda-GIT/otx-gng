@@ -2537,9 +2537,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "otx-games"
+version = "0.2.0"
+dependencies = [
+ "otx-monitor",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "winreg",
+]
+
+[[package]]
 name = "otx-gng"
 version = "0.2.0"
 dependencies = [
+ "otx-games",
  "otx-monitor",
  "otx-net",
  "otx-protocol",

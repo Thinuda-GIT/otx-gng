@@ -12,6 +12,9 @@ import { computeHealth } from "../lib/healthScore";
 import { useLive } from "../store/live";
 import { useSettings } from "../store/settings";
 import { useUi } from "../store/ui";
+import { DEFAULT_PROFILE } from "../store/profiles";
+
+const FALLBACK_GAME: Game = { id: "", name: "", launcher: "manual", exe: "", installPath: "", sizeGB: 0, lastPlayed: null, tint: "30 242 160", antiCheat: null, engine: "other", profile: DEFAULT_PROFILE };
 
 type OrbState = "ready" | "boosting" | "boosted" | "game";
 
@@ -36,7 +39,10 @@ export function Home() {
   const [confirmRevert, setConfirmRevert] = useState(false);
   const [focusOn, setFocusOn] = useState(false);
 
-  const running = games.find((g) => g.id === simulateGameId) ?? null;
+  const realGame = useLive((s) => s.runningGame);
+  const running =
+    games.find((g) => g.id === simulateGameId) ??
+    (realGame ? games.find((g) => g.id === realGame.gameId) ?? { ...(games[0] ?? FALLBACK_GAME), id: realGame.gameId, name: realGame.exe.replace(/\.exe$/i, ""), exe: realGame.exe, antiCheat: null } : null);
 
   const refreshChanges = () => void backend.getChanges().then(setChanges);
   useEffect(() => {

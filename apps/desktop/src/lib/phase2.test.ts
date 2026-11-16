@@ -86,3 +86,26 @@ describe("RAM status rule and routine", async () => {
     expect(shouldClean({ ...base, needsCleaning: false, scheduleOn: true, everyHours: 1, now: 4 * 3_600_000, lastClean: 0 })).toBe("schedule");
   });
 });
+
+describe("Game Mode mapping", async () => {
+  const { sessionProfileFrom, tintFor } = await import("../backend/gameMode");
+  const { DEFAULT_PROFILE } = await import("../store/profiles");
+  const { sameGame } = await import("./useGameWatcher");
+  it("maps profiles safely (no Realtime, plain exe names only)", () => {
+    const p = sessionProfileFrom({ ...DEFAULT_PROFILE, cpuPriority: "high", backgroundApps: ["Spotify.exe", "C:/evil/x.exe", "rm -rf"], tweakPreset: "default" });
+    expect(p.gamePriority).toBe("high");
+    expect(p.background).toEqual(["Spotify.exe"]);
+    expect(p.highPerformancePower).toBe(false);
+    expect(sessionProfileFrom({ ...DEFAULT_PROFILE, cpuPriority: "above" }).gamePriority).toBe("aboveNormal");
+  });
+  it("tints are stable rgb triplets", () => {
+    expect(tintFor("Valorant")).toBe(tintFor("Valorant"));
+    expect(tintFor("Valorant")).toMatch(/^\d{1,3} \d{1,3} \d{1,3}$/);
+  });
+  it("detects the same running game by pid and creation time", () => {
+    const g = { gameId: "steam:730", exe: "cs2.exe", process: { pid: 4, createTime: "1" } };
+    expect(sameGame(g, { ...g })).toBe(true);
+    expect(sameGame(g, { ...g, process: { pid: 4, createTime: "2" } })).toBe(false);
+    expect(sameGame(null, null)).toBe(true);
+  });
+});

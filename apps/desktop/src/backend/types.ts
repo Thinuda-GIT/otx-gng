@@ -296,6 +296,8 @@ export interface Backend {
 
   getGames(): Promise<Game[]>;
   updateGameProfile(id: string, profile: GameProfile): Promise<void>;
+  /** Starts the game through its launcher (desktop app only). */
+  launchGame(id: string): Promise<void>;
 
   getChanges(): Promise<ChangeRecord[]>;
   revertChange(id: string): Promise<void>;

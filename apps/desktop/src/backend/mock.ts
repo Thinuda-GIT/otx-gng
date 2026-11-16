@@ -351,6 +351,11 @@ export class MockBackend implements Backend {
     if (g) g.profile = { ...profile };
   }
 
+  async launchGame(id: string) {
+    await sleep(300);
+    this.simulateGame(id);
+  }
+
   async getChanges() {
     return [...this.changes].sort((a, b) => b.at - a.at);
   }

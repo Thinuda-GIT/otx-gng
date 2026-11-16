@@ -108,6 +108,8 @@ export function Settings() {
           </Panel>
 
           <Panel title={t("settings.optimization")}>
+            <ToggleRow label="Start Game Mode automatically" hint="When a game from your Library (or a known game) starts, apply its profile; everything reverts when it closes. Needs the Core service." checked={s.autoGameMode} onChange={(v) => s.set("autoGameMode", v)} />
+            <Divider />
             <ToggleRow label={t("settings.realtime")} help={t("settings.realtimeHint")} badge={<GlassBadge tone="beta">{t("common.beta")}</GlassBadge>} checked={s.realtimeOptimization} onChange={(v) => s.set("realtimeOptimization", v)} />
             <Divider />
             <ToggleRow label={t("settings.smart")} help={t("settings.smartHint")} badge={<GlassBadge tone="recommended">{t("common.recommended")}</GlassBadge>} checked={s.smartOptimization} onChange={(v) => s.set("smartOptimization", v)} />

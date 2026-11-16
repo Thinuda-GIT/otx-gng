@@ -6,6 +6,7 @@ members = [
   "crates/otx-monitor",
   "crates/otx-tweaks",
   "crates/otx-net",
+  "crates/otx-games",
   "crates/otx-core",
   "apps/desktop/src-tauri",
 ]

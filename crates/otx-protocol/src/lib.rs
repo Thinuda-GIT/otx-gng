@@ -89,6 +89,56 @@ pub enum Request {
     /// (DHCP) when `servers` is empty.
     #[serde(rename_all = "camelCase")]
     SetDns { servers: Vec<String>, dry_run: bool },
+    /// Start a Game Mode session. `game` is None for a general tune-up (no game running).
+    /// Every change is temporary and reverted by EndSession, by the Core's own watchdog when
+    /// the game exits, or at the next Core start after a crash or reboot.
+    #[serde(rename_all = "camelCase")]
+    StartSession { game: Option<ProcessRef>, profile: SessionProfile, dry_run: bool },
+    EndSession,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionProfile {
+    /// Game priority (High at most).
+    pub game_priority: PriorityLevel,
+    /// Exe names of background apps to calm (Below Normal + efficiency mode).
+    pub background: Vec<String>,
+    pub clean_memory: bool,
+    /// Apps the RAM cleaner must not trim (plain exe names).
+    pub allow: Vec<String>,
+    pub high_performance_power: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum StepStatus {
+    Done,
+    Skipped,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionStep {
+    pub id: String,
+    pub label: String,
+    pub status: StepStatus,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SessionReport {
+    pub dry_run: bool,
+    pub steps: Vec<SessionStep>,
+    #[ts(type = "number")]
+    pub freed_mb: i64,
+    pub active: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, TS)]
@@ -206,6 +256,7 @@ pub enum Response {
     Changes(Vec<ChangeEntry>),
     Tweaks(Vec<TweakStatus>),
     RamClean(RamCleanReport),
+    Session(SessionReport),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]

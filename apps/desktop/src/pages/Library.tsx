@@ -8,6 +8,8 @@ import { setGameTint } from "../lib/dom";
 import { timeAgo } from "../lib/format";
 import { useSettings } from "../store/settings";
 import { useUi } from "../store/ui";
+import { cleanRamNow } from "../lib/actions";
+import { isTauri } from "../lib/tauri";
 
 const LAUNCHER: Record<Game["launcher"], string> = {
   steam: "Steam",
@@ -34,18 +36,30 @@ export function Library() {
 
   const play = async (g: Game) => {
     setLaunching(g.id);
-    await backend.boost(g.id, () => undefined);
-    setLaunching(null);
-    setSetting("simulateGameId", g.id); // preview: the "game" is now running
-    toast({ tone: "ok", title: `${g.name} launched with its profile`, body: "Memory was cleaned before launch. In the real app the game starts through its launcher." });
-    logActivity(`Played ${g.name} from Library`);
-    go("home");
+    try {
+      // Before-launch cleaning: free memory first (when the profile asks), then start the game.
+      // Game Mode itself starts when the watcher sees the game's process.
+      if (g.profile.ramCleanOnLaunch) await cleanRamNow("boost").catch(() => undefined);
+      await backend.launchGame(g.id);
+      if (!isTauri()) setSetting("simulateGameId", g.id); // browser preview: pretend it started
+      toast({ tone: "ok", title: `Starting ${g.name}`, body: "Game Mode turns on when the game's process appears, and reverts when it closes." });
+      logActivity(`Played ${g.name} from Library`);
+      go("home");
+    } catch (e) {
+      toast({ tone: "error", title: `Could not start ${g.name}`, body: String(e) });
+    } finally {
+      setLaunching(null);
+    }
   };
 
   const saveProfile = async (g: Game, p: GameProfile) => {
-    await backend.updateGameProfile(g.id, p);
-    setGames((xs) => xs.map((x) => (x.id === g.id ? { ...x, profile: p } : x)));
-    setOpen({ ...g, profile: p });
+    try {
+      await backend.updateGameProfile(g.id, p);
+      setGames((xs) => xs.map((x) => (x.id === g.id ? { ...x, profile: p } : x)));
+      setOpen({ ...g, profile: p });
+    } catch (e) {
+      toast({ tone: "error", title: "Setting not changed", body: String(e) });
+    }
   };
 
   return (

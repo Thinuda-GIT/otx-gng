@@ -18,6 +18,9 @@ fn ledger_path() -> Option<PathBuf> {
 struct Ledger {
     /// tweak id → (unix time, snapshot)
     applied: BTreeMap<String, (u64, Vec<Prev>)>,
+    /// Display titles for non-manifest entries (per-game settings).
+    #[serde(default)]
+    titles: BTreeMap<String, String>,
 }
 
 fn load() -> Ledger {
@@ -120,11 +123,12 @@ pub async fn tweak_set(state: tauri::State<'_, AppState>, id: String, on: bool, 
 /// Per-user tweaks applied by OTX.GNG, for the "What OTX.GNG changed" list.
 #[tauri::command]
 pub fn user_changes() -> Vec<ChangeEntry> {
-    load()
-        .applied
+    let l = load();
+    let titles = l.titles.clone();
+    l.applied
         .into_iter()
         .map(|(id, (t, _))| ChangeEntry {
-            title: otx_tweaks::find(&id).map(|m| m.title).unwrap_or_else(|| id.clone()),
+            title: otx_tweaks::find(&id).map(|m| m.title).or_else(|| titles.get(&id).cloned()).unwrap_or_else(|| id.clone()),
             id: format!("user:{id}"),
             created_unix: t,
             detail: "Your Windows account setting".into(),
@@ -145,6 +149,7 @@ pub async fn user_revert(id: Option<String>) -> Result<u32, String> {
             if let Some((_, prev)) = ledger.applied.get(&k).cloned() {
                 otx_tweaks::revert(&sys, &prev)?;
                 ledger.applied.remove(&k);
+                ledger.titles.remove(&k);
                 n += 1;
             }
         }
@@ -210,4 +215,27 @@ pub async fn dns_set(state: tauri::State<'_, AppState>, servers: Vec<String>, dr
         Err(e) if e.link != otx_protocol::CoreLink::Connected => Err(CORE_DOWN.into()),
         Err(e) => Err(e.message),
     }
+}
+
+/// Applies ad-hoc per-user operations under a ledger id (per-game settings). Re-applying first
+/// reverts the previous value so the stored snapshot is always the true original. Empty `ops`
+/// just reverts.
+pub fn set_user_ops(ledger_id: &str, title: &str, ops: Vec<otx_tweaks::model::Op>) -> Result<Vec<String>, String> {
+    let sys = WinSys { scope: Scope::User };
+    let mut ledger = load();
+    let mut changes = Vec::new();
+    if let Some((_, prev)) = ledger.applied.remove(ledger_id) {
+        otx_tweaks::revert(&sys, &prev)?;
+        changes.push(format!("Reverted: {title}"));
+    }
+    ledger.titles.remove(ledger_id);
+    if !ops.is_empty() {
+        let m = otx_tweaks::Manifest { id: ledger_id.into(), scope: Scope::User, title: title.into(), requires_reboot: false, in_high_performance: false, unsupported: None, ops };
+        let a = otx_tweaks::apply(&m, &sys, false)?;
+        changes.extend(a.changes);
+        ledger.applied.insert(ledger_id.into(), (now(), a.prev));
+        ledger.titles.insert(ledger_id.into(), title.into());
+    }
+    save(&ledger)?;
+    Ok(changes)
 }

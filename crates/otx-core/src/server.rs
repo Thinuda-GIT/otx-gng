@@ -162,7 +162,7 @@ async fn handle_client(mut pipe: NamedPipeServer, state: Arc<CoreState>) -> anyh
 }
 
 /// The allow-list dispatcher: one arm per permitted request.
-pub fn dispatch(state: &CoreState, f: RequestFrame) -> ResponseFrame {
+pub fn dispatch(state: &Arc<CoreState>, f: RequestFrame) -> ResponseFrame {
     tracing::debug!(id = f.id, request = ?f.request, "request");
     match f.request {
         Request::Hello { .. } => ResponseFrame::err(f.id, ErrorCode::Validation, "already authenticated"),
@@ -179,6 +179,8 @@ pub fn dispatch(state: &CoreState, f: RequestFrame) -> ResponseFrame {
         Request::SetTweak { id, on, dry_run } => result(f.id, crate::boost::set_tweak(state, &id, on, dry_run)),
         Request::CleanMemory { methods, allow, skip, dry_run } => result(f.id, crate::boost::clean_memory(state, &methods, &allow, &skip, dry_run)),
         Request::SetDns { servers, dry_run } => result(f.id, crate::boost::set_dns(state, &servers, dry_run)),
+        Request::StartSession { game, profile, dry_run } => result(f.id, crate::session::start(state, game, &profile, dry_run)),
+        Request::EndSession => ResponseFrame::ok(f.id, crate::session::handle_end(state)),
     }
 }
 

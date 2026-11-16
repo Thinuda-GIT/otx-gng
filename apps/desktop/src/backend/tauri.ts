@@ -9,6 +9,20 @@ import type { DnsResult, DnsServer, RamCleanResult, RamMethod, RamStatus, Tweak,
 import type { RamCleanReport } from "./generated/RamCleanReport";
 import type { TweakStatus } from "./generated/TweakStatus";
 import { MOCK_NOT_RECOMMENDED } from "./mockData";
+import type { BoostStep, BoostSummary, Game, GameProfile } from "./types";
+import { startSession, stepsFrom, tintFor } from "./gameMode";
+import { useProfiles } from "../store/profiles";
+
+interface DetectedGame {
+  id: string;
+  name: string;
+  launcher: string;
+  installPath: string;
+  exe: string | null;
+  sizeGb: number | null;
+  launch: string | null;
+  antiCheat: string | null;
+}
 import { useLive } from "../store/live";
 import { useSettings } from "../store/settings";
 import type { SystemSnapshot as WireSnapshot } from "./generated/SystemSnapshot";
@@ -230,6 +244,52 @@ export class TauriBackend extends MockBackend {
     const current = await invoke<string[]>("dns_current").catch(() => [] as string[]);
     const servers = await this.getDnsServers();
     return servers.find((s) => !s.isp && s.v4.length > 0 && s.v4.every((ip) => current.includes(ip)))?.id ?? null;
+  }
+
+  /* ---------------- Library and Game Mode (Phase 5) ---------------- */
+
+  override async getGames(): Promise<Game[]> {
+    const found = await invoke<DetectedGame[]>("games_scan");
+    const profiles = useProfiles.getState();
+    const known: Game["launcher"][] = ["steam", "epic", "riot", "battlenet", "xbox", "ea", "ubisoft", "manual"];
+    return found.map((g) => ({
+      id: g.id,
+      name: g.name,
+      launcher: known.includes(g.launcher as Game["launcher"]) ? (g.launcher as Game["launcher"]) : "manual",
+      exe: g.exe ?? "",
+      installPath: g.installPath,
+      sizeGB: g.sizeGb ?? 0,
+      lastPlayed: null,
+      tint: tintFor(g.name),
+      antiCheat: g.antiCheat,
+      engine: g.exe && /-shipping\.exe$/i.test(g.exe) ? "unreal" : "other",
+      profile: profiles.get(g.id),
+    }));
+  }
+
+  override async updateGameProfile(id: string, profile: GameProfile): Promise<void> {
+    const before = useProfiles.getState().get(id);
+    useProfiles.getState().put(id, profile);
+    if (before.gpuPreference !== profile.gpuPreference || before.disableFullscreenOptimizations !== profile.disableFullscreenOptimizations) {
+      const gpu = profile.gpuPreference === "high-performance" ? 2 : profile.gpuPreference === "power-saving" ? 1 : 0;
+      await invoke<string[]>("game_settings", { id, gpu, fsoOff: profile.disableFullscreenOptimizations });
+    }
+  }
+
+  override async launchGame(id: string): Promise<void> {
+    await invoke("game_launch", { id });
+  }
+
+  override async boost(gameId: string | null, onStep: (steps: BoostStep[]) => void): Promise<BoostSummary> {
+    const t0 = Date.now();
+    const running = useLive.getState().runningGame;
+    const target = running && (gameId === null || running.gameId === gameId) ? running : null;
+    const profile = useProfiles.getState().get(target?.gameId ?? gameId ?? "default");
+    onStep([{ id: "start", label: "Applying Game Mode…", status: "running" }]);
+    const r = await startSession(target?.process ?? null, profile);
+    const steps = stepsFrom(r);
+    onStep(steps);
+    return { freedMB: Math.max(0, r.freedMb), steps, durationMs: Date.now() - t0 };
   }
 
   override async addDnsServer(name: string, v4: string[]): Promise<DnsServer> {

@@ -20,6 +20,7 @@ mod process;
 mod ram;
 mod security;
 mod server;
+mod session;
 mod state;
 
 use journal::{Journal, SystemReverter};

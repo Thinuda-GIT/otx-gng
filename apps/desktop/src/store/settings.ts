@@ -46,6 +46,8 @@ export interface Settings {
   ramScheduleOn: boolean;
   ramSmartMode: boolean;
   ramAllowList: string[];
+  // Game Mode
+  autoGameMode: boolean;
   // Onboarding
   firstRunDone: boolean;
   // Developer (Phase 1 only): simulates a game in the foreground to test glass auto-degrade
@@ -84,6 +86,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ramScheduleOn: false,
   ramSmartMode: true,
   ramAllowList: ["Discord.exe", "obs64.exe"],
+  autoGameMode: true,
   firstRunDone: false,
   simulateGameId: null,
 };
